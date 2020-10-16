@@ -1,0 +1,92 @@
+---
+
+  - smabot.windows.command_info:
+      command: git
+
+  - smabot.windows.command_info:
+      command: git
+      type: Application
+
+  - smabot.windows.command_info:
+      command: git
+      type: Alias
+
+  - smabot.windows.command_info:
+      command: git
+      type: 
+        - Application
+        - Alias
+
+  - smabot.windows.command_info:
+      command: python
+
+  - smabot.windows.command_info:
+      command: choco
+
+  - smabot.windows.command_info:
+      command: fooboo
+
+  - smabot.windows.command_info:
+      command: 
+        - git
+        - notepad
+
+##   - smabot.containers.normalize_image_copycfg:
+##     register: _tmp_copycfg
+## 
+## 
+##   - set_fact:
+##       ## ok, this is new, here not even the mighty magic legacy set_fact can update / overwrite handle_system_certs_args var, maybe because this is originally set as by "vars:" for a role include (??)
+##       ##copy_to_image_args: "{{ _tmp_sslcert_cfg.normalized }}"
+##       copy_to_image_args_normed: "{{ _tmp_copycfg.normalized }}"
+## 
+##       _tmpimg_id: >-
+##         {{ _tmp_copycfg.normalized.image_owner }}/{{ _tmp_copycfg.normalized.image_name }}
+## 
+## 
+##   # disable chocolatey default source, is does not work anyway 
+##   # (proxies and such), we funnel everything through our nexus
+## init_chocolatey_args:
+##   sources:
+##     ## if set disables the chocolatey default source
+##     disable_default: true ## optional, defaults to false
+##     sources:
+## 
+##       - "list of source urls"
+## 
+## 
+##   - name: install chocolatey from script
+##     win_command: powershell.exe -
+##     args:
+##       # this creates arg here makes sure this only runs, 
+##       # if the exe is not found
+##       creates: C:\ProgramData\chocolatey\choco.exe
+##       stdin: >-
+##         $url = '{{ external_services.scripts.ansible.windows }}/install_choco.ps1'
+## 
+##         $file = "$env:temp\instchoco.ps1"
+## 
+##         (New-Object -TypeName System.Net.WebClient -ErrorAction Stop).DownloadFile($url, $file)
+## 
+##         powershell -ExecutionPolicy ByPass 
+##         -File $file '{{ external_services.chocolatey.repos[0].url }}'
+## 
+## 
+##   - name: disable chocolatey default source
+##     win_chocolatey_source:
+##       name: chocolatey
+##       state: disabled
+##     when: init_chocolatey_args.get('sources', {}).get('disable_default', False)
+##  
+## 
+##   - name: add custom choco source  ==>>  {{ _choco_src_iter.name }}
+##     win_chocolatey_source:
+##       name: '{{ _choco_src_iter.name }}'
+##       state: present
+##       source: '{{ _choco_src_iter.url }}'
+##     loop: >-
+##       {{ init_chocolatey_args.get('sources', {}).sources 
+##        | default([], True) }}
+##     loop_control:
+##       loop_var: _choco_src_iter
+
