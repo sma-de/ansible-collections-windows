@@ -1,98 +1,94 @@
 ---
 
-  - smabot.windows.command_info:
-      command: git
+##
+## I'm pretty sure that the vanilla ansible chocolatey module already 
+## handles bootstrapping of choco itself pretty well for default cases, 
+## so by all means skip this role and use that if it works for you, this 
+## is designed for edge cases where the standard method fails:
+##
+##    Szenario A) Your machine is behind a (corporate) proxy which messes 
+##      up internet traffic so that standard method fails, at the same you 
+##      have (working) access to a repository manager which functions as 
+##      choco package server / proxy, for that case this role is optimal 
+##      as it basically allows choco bootstrapping from arbitrary URLs / sources
+##
 
-  - smabot.windows.command_info:
-      command: git
-      type: Application
-
-  - smabot.windows.command_info:
-      command: git
-      type: Alias
-
-  - smabot.windows.command_info:
-      command: git
-      type: 
-        - Application
-        - Alias
-
-  - smabot.windows.command_info:
-      command: python
-
-  - smabot.windows.command_info:
-      command: choco
-
-  - smabot.windows.command_info:
-      command: fooboo
-
-  - smabot.windows.command_info:
-      command: 
-        - git
-        - notepad
-
-  - smabot.windows.command_info:
-      command: 
-        - git
-        - fooboo
-        - notepad
-
-##   - smabot.containers.normalize_image_copycfg:
-##     register: _tmp_copycfg
-## 
-## 
-##   - set_fact:
-##       ## ok, this is new, here not even the mighty magic legacy set_fact can update / overwrite handle_system_certs_args var, maybe because this is originally set as by "vars:" for a role include (??)
-##       ##copy_to_image_args: "{{ _tmp_sslcert_cfg.normalized }}"
-##       copy_to_image_args_normed: "{{ _tmp_copycfg.normalized }}"
-## 
-##       _tmpimg_id: >-
-##         {{ _tmp_copycfg.normalized.image_owner }}/{{ _tmp_copycfg.normalized.image_name }}
-## 
-## 
-##   # disable chocolatey default source, is does not work anyway 
-##   # (proxies and such), we funnel everything through our nexus
 ## init_chocolatey_args:
 ##   sources:
 ##     ## if set disables the chocolatey default source
-##     disable_default: true ## optional, defaults to false
+##     disable_default: false ## optional, defaults to true as normally it is not expected that this role is used if default source works fine for one
 ##     sources:
 ## 
 ##       - "list of source urls"
 ## 
-## 
-##   - name: install chocolatey from script
-##     win_command: powershell.exe -
-##     args:
-##       # this creates arg here makes sure this only runs, 
-##       # if the exe is not found
-##       creates: C:\ProgramData\chocolatey\choco.exe
-##       stdin: >-
-##         $url = '{{ external_services.scripts.ansible.windows }}/install_choco.ps1'
-## 
-##         $file = "$env:temp\instchoco.ps1"
-## 
-##         (New-Object -TypeName System.Net.WebClient -ErrorAction Stop).DownloadFile($url, $file)
-## 
-##         powershell -ExecutionPolicy ByPass 
-##         -File $file '{{ external_services.chocolatey.repos[0].url }}'
+##   ## note: atm actually does not really set install dir (which always 
+##   ##   uses internal default), but is only used for existence testing
+##   install_directory: ## optional, defaults to: C:\ProgramData\chocolatey
 ## 
 ## 
-##   - name: disable chocolatey default source
-##     win_chocolatey_source:
-##       name: chocolatey
-##       state: disabled
-##     when: init_chocolatey_args.get('sources', {}).get('disable_default', False)
-##  
 ## 
-##   - name: add custom choco source  ==>>  {{ _choco_src_iter.name }}
-##     win_chocolatey_source:
-##       name: '{{ _choco_src_iter.name }}'
-##       state: present
-##       source: '{{ _choco_src_iter.url }}'
-##     loop: >-
-##       {{ init_chocolatey_args.get('sources', {}).sources 
-##        | default([], True) }}
-##     loop_control:
-##       loop_var: _choco_src_iter
+
+  - name: check if chocolatey is already installed by searching $PATH for exe
+    smabot.windows.command_info:
+      command: choco
+      type: Application
+    register: _res_find_choco
+
+
+  - name: check if chocolatey is already installed by probing filepath
+    ansible.windows.win_stat:
+      path: "{{ init_chocolatey_args.install_directory | default('C:\\ProgramData\\chocolatey', True) }}/choco.exe"
+    register: _res_choco_fp
+
+    ## no reason applying this second test when first is enough
+    when: _res_find_choco.command_info.get('choco.exe', None) is falsy
+
+
+  - block:
+
+      - name: create tmpdir on target
+        ansible.windows.win_tempfile:
+          state: directory
+        register: _res_tmpdir
+
+
+      - name: copy choco install script to target
+        ansible.windows.win_template:
+          src: install_choco.ps1
+          dest: "{{ _res_tmpdir.path }}/install_choco.ps1"
+
+
+      - name: install chocolatey from script
+        ansible.windows.win_command: powershell.exe -
+        args:
+          stdin: >-
+            powershell -ExecutionPolicy ByPass 
+            -File "{{ _res_tmpdir.path }}/install_choco.ps1" 
+            '{{ init_chocolatey_args.sources.sources[0].url }}'
+
+      - name: remove tmpdir from target
+        ansible.windows.win_file:
+          path: "{{ _res_tmpdir.path }}"
+          state: absent
+ 
+    ## run install choco script only if all existance test failed
+    when: _res_find_choco.command_info.get('choco.exe', None) is falsy and not _res_choco_fp.stat.exists
+
+
+  - name: disable chocolatey default source
+    win_chocolatey_source:
+      name: chocolatey
+      state: disabled
+    when: init_chocolatey_args.sources.get('disable_default', True)
+
+
+  - name: add custom choco source  ==>>  {{ _choco_src_iter.name }}
+    win_chocolatey_source:
+      name: '{{ _choco_src_iter.name }}'
+      state: present
+      source: '{{ _choco_src_iter.url }}'
+    loop: >-
+      {{ init_chocolatey_args.sources.sources }}
+    loop_control:
+      loop_var: _choco_src_iter
 
