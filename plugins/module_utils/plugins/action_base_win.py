@@ -12,16 +12,11 @@ from ansible.module_utils.six import iteritems, string_types
 
 from ansible_collections.smabot.base.plugins.module_utils.plugins.action_base import BaseAction
 
-##from ansible_collections.smabot.base.plugins.module_utils.utils.dicting import get_subdict, SUBDICT_METAKEY_ANY
-##from ansible_collections.smabot.base.plugins.module_utils.utils.utils import ansible_assert
-##from ansible_collections.smabot.containers.plugins.module_utils.common import DOCKER_CFG_DEFAULTVAR
+from ansible_collections.smabot.base.plugins.module_utils.utils.utils import ansible_assert
+from ansible.utils.display import Display
 
 
-def to_pshell_array_param(val):
-    if not isinstance(val, list)
-        val = [val]
-
-    return ','.join(val)
+display = Display()
 
 
 class ActionBaseWin(BaseAction):
@@ -34,7 +29,8 @@ class ActionBaseWin(BaseAction):
     ##   if you need to do more than one can senseably fit into a single 
     ##   pipeline, use the optional preprocess param
     def exec_powershell_script(self, finalcmd, preprocess=None, 
-        extra_psargs=None, keyfilter=None, keys_exclude=False, **kwargs
+        extra_psargs=None, keyfilter=None, keys_exclude=False, 
+        data_return=False, **kwargs
     ):
         script = preprocess or ''
 
@@ -42,23 +38,50 @@ class ActionBaseWin(BaseAction):
             script += '\n'
 
         # make sure to return result as json
-        script += "{} | ConvertTo-Json".format(finalcmd)
+        if data_return:
+            script += "{} | ConvertTo-Json".format(finalcmd)
+        else:
+            script += "{}".format(finalcmd)
 
         modargs = extra_psargs or {}
-        modargs.update(cmd='powershell.exe -', stdin=script)
 
-        res = self.exec_module('win_command', modargs=modargs, **kwargs)
+        ## note: _raw_params is the magic internal key for free_form args
+        modargs.update(stdin=script, _raw_params='powershell.exe -')
+
+        res = self.exec_module('ansible.windows.win_command', modargs=modargs, **kwargs)
+
+        if not data_return:
+            return res
 
         ## note: normally, a subcall failing will immediately abort this 
         ##   plugin, but it is possible, that a subcall failure is deemed 
         ##   acceptable for specific use cases, if that's occure, just 
         ##   return the raw result
-        if res.get('failed', False):
+        tmp = res['stdout']
+        if not tmp:
+            ansible_assert(res.get('failed', False), 
+               "an unfailed powershell data-returning call must"\
+               " always have valid json in stdout"
+            )
+
+            res['result_json'] = {}
             return res
 
         ## on success we expect stdout to contain valid json result object
-        tmp = json.loads(res['stdout'])
+        tmp = json.loads(tmp)
         delist = False
+
+        display.vvv(
+           "[ACTION_PLUGIN_WIN] :: execute powershell script :: raw"\
+           " jsoned results: {}".format(tmp)
+        )
+
+        display.vvv(
+           "[ACTION_PLUGIN_WIN] :: execute powershell script ::"\
+           " json key filter ({1}): {0}".format(keyfilter, 
+               'exclude' if keys_exclude else 'include'
+           )
+        )
 
         if not isinstance(tmp, list):
             delist = True
@@ -84,6 +107,12 @@ class ActionBaseWin(BaseAction):
             tmp = tmp[0]
 
         res['result_json'] = tmp
+
+        display.vvv(
+           "[ACTION_PLUGIN_WIN] :: execute powershell script ::"\
+           " final json results: {}".format(tmp)
+        )
+
         return res
 
 
@@ -98,19 +127,42 @@ class ActionBaseWinPowerCommand(ActionBaseWin):
         pass
 
     @property
+    def extra_args(self):
+        return {}
+
+    def run_specific(self, result):
+        return self.exec_powershell_script(self.final_cmd, **self.extra_args)
+
+
+class ActionBaseWinPowerCmdDataReturn(ActionBaseWinPowerCommand):
+
+    def __init__(self, *args, **kwargs):
+        super(ActionBaseWinPowerCmdDataReturn, self).__init__(*args, **kwargs)
+
+    @property
     @abc.abstractmethod
     def return_key(self):
         pass
 
     @property
     def extra_args(self):
-        return {}
+        tmp = super(ActionBaseWinPowerCmdDataReturn, self).extra_args
+
+        tmp.update({
+          'data_return': True,
+        })
+
+        return tmp
+
 
     def _postproc_json(self, jsonres):
         return jsonres
 
     def run_specific(self, result):
-        tmp = self.exec_powershell_script(self.final_cmd, **self.extra_args)
+        tmp = super(ActionBaseWinPowerCmdDataReturn, self).run_specific(
+          result
+        )
+
         result[self.return_key] = self._postproc_json(tmp['result_json'])
         return result
 

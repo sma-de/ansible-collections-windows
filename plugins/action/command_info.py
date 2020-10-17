@@ -11,8 +11,9 @@ import re
 ####from ansible.module_utils._text import to_native
 from ansible.module_utils.six import iteritems, string_types
 
-from ansible_collections.smabot.windows.plugins.module_utils.plugins.action_base_win import ActionBaseWinPowerCommand
+from ansible_collections.smabot.windows.plugins.module_utils.plugins.action_base_win import ActionBaseWinPowerCmdDataReturn
 from ansible_collections.smabot.windows.plugins.module_utils.utils.powershell import to_pshell_array_param
+from ansible_collections.smabot.base.plugins.module_utils.utils.utils import ansible_assert
 
 
 COMMAND_TYPES = {
@@ -21,7 +22,7 @@ COMMAND_TYPES = {
 
 
 ## command_info
-class ActionModule(ActionBaseWinPowerCommand):
+class ActionModule(ActionBaseWinPowerCmdDataReturn):
 
     def __init__(self, *args, **kwargs):
         super(ActionModule, self).__init__(*args, **kwargs)
@@ -54,15 +55,25 @@ class ActionModule(ActionBaseWinPowerCommand):
 
     @property
     def extra_args(self):
-        return {'keyfilter': ['name'] + self.get_taskparam('keyfilter') }
+        tmp = super(ActionModule, self).extra_args
+
+        tmp.update({
+           'keyfilter': ['Name'] + self.get_taskparam('keyfilter'),
+
+           ## detecting non existant programs is a normal feature 
+           ## of this, not an error
+           'ignore_error': True, 
+        })
+
+        return tmp
 
     @property
     def argspec(self):
         tmp = super(ActionModule, self).argspec
 
         tmp.update({
-          'command': (list(string_types), [list(string_types)]),
-          'type': (list(string_types), [list(string_types)], []),
+          'command': (list(string_types) + [list(string_types)]),
+          'type': (list(string_types) + [list(string_types)], []),
 
            ## note: powershell json can actually be quite verbose, 
            ##   but we only need a few keys here normally
@@ -75,6 +86,9 @@ class ActionModule(ActionBaseWinPowerCommand):
 
 
     def _postproc_json(self, jsonres):
+        if not jsonres:
+            return jsonres
+
         ## in general this can return more than one matching command
         if not isinstance(jsonres, list):
             jsonres = [jsonres]
@@ -93,7 +107,7 @@ class ActionModule(ActionBaseWinPowerCommand):
 
                 jo['CommandType'] = tmp
 
-            res[jo['name']] = jo
+            res[jo['Name']] = jo
 
         return res
 

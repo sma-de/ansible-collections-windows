@@ -9,7 +9,7 @@ __metaclass__ = type
 
 
 def to_pshell_array_param(val):
-    if not isinstance(val, list)
+    if not isinstance(val, list):
         val = [val]
 
     return ','.join(val)

@@ -12,6 +12,7 @@ authors:
 dependencies:
 ##    "other_namespace.collection1": ">=1.0.0"
 ##    "other_namespace.collection2": ">=2.0.0,<3.0.0"
+    "ansible.windows": "*"    # note: "*" selects the highest version available
     "smabot.base": "*"    # note: "*" selects the highest version available
 ##license:
 ##    - "MIT"

@@ -31,6 +31,12 @@
         - git
         - notepad
 
+  - smabot.windows.command_info:
+      command: 
+        - git
+        - fooboo
+        - notepad
+
 ##   - smabot.containers.normalize_image_copycfg:
 ##     register: _tmp_copycfg
 ## 
