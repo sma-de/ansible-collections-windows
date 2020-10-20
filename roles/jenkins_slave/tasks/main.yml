@@ -1,0 +1,20 @@
+---
+
+  - import_role:
+      name: smabot.windows.win_capability
+    vars:
+      win_capability_args:
+        ## note: the reason for this is, that it clashes with jenkins ssh agent: https://issues.jenkins-ci.org/browse/JENKINS-51968
+        task_name: make sure that windows builtin experimental ssh client is disabled as it currently breaks jenkins
+        cap_args: 
+          caps: .*openssh.*
+          state: absent
+
+
+##  - name: install java runtime for jenkins
+##    ansible.windows.win_chocolatey:
+##      name: adoptopenjdk8jre
+##      version: '8.232.9'
+##      state: present
+
+

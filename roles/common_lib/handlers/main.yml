@@ -1,0 +1,6 @@
+---
+
+  - name: reboot windows
+    win_reboot:
+    listen: "reboot os"
+

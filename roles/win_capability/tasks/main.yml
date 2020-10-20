@@ -1,0 +1,68 @@
+---
+
+## win_capability_args:
+##   task_name: ## optional
+##   cap_args: ## mandatory
+##   become: ## optional, default no
+
+    ##
+    ## note: as this role actually has no real code (tasks) to run here, 
+    ##   we only just import its "namespace", in principle it would be 
+    ##   much better to use the meta dir for this, but as we learned 
+    ##   today, meta deps are not resolved / imported when this role 
+    ##   itself is "executed" by import/include_role statement / task, but 
+    ##   only when the high level playbook feature "roles:" is used, so 
+    ##   to make sure deps are always resolved we actually must import 
+    ##   them explicitly like this here
+    ##
+  - import_role:
+      name: smabot.windows.common_lib
+
+
+  - name: >-
+     {{ win_capability_args.task_name 
+      | default('handle windows capabilities', True) }}
+
+    smabot.windows.win_capability: >-
+      {{ win_capability_args.cap_args }}
+
+      ## ## note: be aware that the actual name also includes this strange version suffix, so:
+      ## ##caps: OpenSSH.Client~~~~0.0.1.0  ## => this is the exact name for openssh client, so it will match
+      ## ##caps: OpenSSH.Client ## => this will not match, as it is not the exact name
+      ## ##caps: OpenSSH.Client.* ## => this will match by the virtue of regex matching
+      ##
+      ## #### one or more (list) name regex of capabilities to handle, be aware
+      ## caps: .*openssh.*
+      ## ##caps: 
+      ## ##  - .*openssh.*
+      ##
+      ## ##caps:
+      ##
+      ## ##    ## note: for state present when installing is needed, meta info like locale and version is probably mandatory, as this is part of the "real name" of the capability
+      ## ##  - name:
+      ## ##    locale: en-US  ## optional on absent, defaults to empty
+      ## ##    version: 0.0.1.0  ## optional on absent
+      ##
+      ## ## as always make sure that thing is there or not
+      ## ##state: present  ## default as usual
+      ## state: absent
+  
+    ## ##
+    ## ## note: even if you use an admin account for your host connection, 
+    ## ##   you still need to use become here for cap installing, but not 
+    ## ##   for removing caps, I think the important difference here is 
+    ## ##   that for install external resources need to be queried while 
+    ## ##   for deinstallation only local resources are used
+    ## ##
+    become: "{{ win_capability_args.become | default('no', True) }}"
+    register: _tmp_wincap_res
+
+
+  - import_role:
+      name: smabot.base.conditional_notify
+    vars:
+      conditional_notify_args:
+        taskname: check if reboot is needed
+        notify: "reboot os"
+        condition: "{{ _tmp_wincap_res.restart_needed }}"
+
