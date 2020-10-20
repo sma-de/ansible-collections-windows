@@ -1,5 +1,11 @@
 ---
 
+##jenkins_slave_args:
+##  disable_winssh: true ## optional, defaults to false
+##  enable_default_java: true ## optional, defaults to false
+##  default_java_extra_args: ## optional, defaults to empty
+##    version: '8.232.9'
+
   - import_role:
       name: smabot.windows.win_capability
     vars:
@@ -9,12 +15,41 @@
         cap_args: 
           caps: .*openssh.*
           state: absent
+    when: jenkins_slave_args.disable_winssh | default(False, True)
 
 
-##  - name: install java runtime for jenkins
-##    ansible.windows.win_chocolatey:
-##      name: adoptopenjdk8jre
-##      version: '8.232.9'
-##      state: present
+    ## default java deselected
+  - block:
 
+      - name: check if java is installed
+        smabot.windows.command_info:
+          command: java
+          type: Application
+        register: _res_find_java
+
+      - ansible.builtin.assert:
+          that: >-
+            ansible_env.JAVA_HOME is defined or
+            _res_find_java.command_info.get('java.exe', False) is truthy
+          fail_msg: >-
+            windows jenkins slave needs java installed on target machine, 
+            either make sure it is installed before calling this role or 
+            enable default java installation by setting 
+            jenkins_slave_args.enable_default_java to true
+
+    when: not (jenkins_slave_args.enable_default_java | default(False, True))
+
+
+    ## default java selected
+  - block:
+
+      - set_fact:
+          _tmp_java_inst_args: >-
+            {{ { 'name': 'adoptopenjdk8jre', 'state': 'present' } 
+             | combine(jenkins_slave_args.default_java_extra_args | default({}, True)) }}
+
+      - name: install default java runtime for jenkins
+        chocolatey.chocolatey.win_chocolatey: "{{ _tmp_java_inst_args }}"
+
+    when: jenkins_slave_args.enable_default_java | default(False, True)
 

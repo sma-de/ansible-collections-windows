@@ -59,11 +59,6 @@ class ActionBaseWin(BaseAction):
         ##   return the raw result
         tmp = res['stdout']
         if not tmp:
-            ansible_assert(res.get('failed', False), 
-               "an unfailed powershell data-returning call must"\
-               " always have valid json in stdout"
-            )
-
             res['result_json'] = {}
             return res
 
