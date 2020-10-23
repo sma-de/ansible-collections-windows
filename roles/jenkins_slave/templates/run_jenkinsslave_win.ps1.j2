@@ -1,0 +1,37 @@
+
+## we only have a single mandatory arg here, the node connection secret
+$secret = $args[0]
+
+## download agent jar and place it into this script's dir
+$agent = "$($PSScriptRoot)\agent.jar"
+
+(New-Object -TypeName System.Net.WebClient -ErrorAction Stop).DownloadFile(
+  '{{ jenkins_slave_args_normed.agent.agent_url }}', $agent
+)
+
+#
+# note: in principle we could the secret also jinja hardcode here, 
+#   but my guts feeling atm is, that having it saved inside win_service 
+#   config and parsing it here as normal param is at least a tiny whiny 
+#   bit more secure, but also maybe not
+#
+# update: we set java to use the windows creds store with 
+#   "Djavax.net.ssl.trustStoreType=WINDOWS-ROOT", so that it will 
+#   find sma root certs
+#
+## <deprecated>
+## java -Djavax.net.ssl.trustStoreType=WINDOWS-ROOT -jar "$agent" \
+##   -jnlpUrl '{{ jenkins_slave_args_normed.agent.node_url }}' \
+##   -secret "$secret" {{ jenkins_slave_args_normed.agent.params | join(' ') }}
+
+##
+## note: there seems to be another scheme for starting the jenkins agent with a slightly different set of arguments and all in all much more flexibility and options to use
+##
+## note.2: the trailing slash at the end of the url param is mandatory, otherwise connection will fail
+##
+java '-Djavax.net.ssl.trustStoreType=WINDOWS-ROOT' `
+  -cp "$agent" hudson.remoting.jnlp.Main -headless `
+  -url '{{ jenkins_slave_args_normed.agent.master_url }}/' `
+  {{ jenkins_slave_args_normed.agent.params | join(' ') }} `
+  "$secret" '{{ jenkins_slave_args_normed.agent.node_name }}'
+

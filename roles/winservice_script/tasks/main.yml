@@ -1,0 +1,63 @@
+---
+
+## winservice_script_args:
+##   rootdir: ## optional, defaults to: C:\winservices\script
+##   source: 
+##     root: ## should normally be the roledir where the script file / dir resides, mandatory
+##     src: ## script file or dir to use (relative path), mandatory
+##     main_script: ## if source is a dir, it is mandatory to specify here which srcdir file is the main script, if src if a file, this is optional and defaults to basename(src), set it if for some reason target file should have another name than source file (e.g. if templating removed .j2 ending or similar)
+##   interpreter: ## interpreter command to use, can be an abs path or just an app name, optional, defaults to powershell
+## 
+##   ## service config, instance of 'winservice_nssm_args'
+##   service: ## mandatory
+## 
+## winservice_nssm_args:
+##   nssm: ## optional, empty default
+##   service: ## mandatory
+##     create: ## mandatory
+##       name:
+##       application:
+##       arguments:
+##       working_directory:
+##       description:
+##       display_name:
+##     config: ## optional
+
+  - debug:
+      var: winservice_script_args
+
+  - smabot.windows.normalize_winservice_script_args:
+    register: _tmp_normres
+
+  - set_fact:
+      winservice_script_args_normed: "{{ _tmp_normres.normalized }}"
+
+
+  - name: check if given interpreter path is valid  ==>>  {{ winservice_script_args_normed.interpreter }}
+    ansible.windows.win_stat:
+      path: "{{ winservice_script_args_normed.interpreter }}"
+    register: _tmp_statres
+    failed_when: not _tmp_statres.stat.exists
+
+
+    ## template script dir / file over to target
+  - import_role: 
+      name: smabot.base.template_recursive
+    vars:
+      template_recursive_args: >-
+        {{ winservice_script_args_normed.templating_args }}
+
+
+  - name: check if copied main script is valid  ==>>  {{ winservice_script_args_normed.source.main_script }}
+    ansible.windows.win_stat:
+      path: "{{ winservice_script_args_normed.main_script }}" 
+    register: _tmp_statres
+    failed_when: not _tmp_statres.stat.exists or _tmp_statres.stat.isdir
+
+
+    ## create and start service
+  - import_role:
+      name: smabot.windows.winservice_nssm
+    vars:
+      winservice_nssm_args: "{{ winservice_script_args_normed.service }}"
+

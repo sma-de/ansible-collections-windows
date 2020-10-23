@@ -1,10 +1,27 @@
 ---
 
 ##jenkins_slave_args:
+##  agent: ## mandatory 
+##    master_url: ## mandatory
+##    node_name: ## mandatory
+##    secret: ## mandatory
+##    workdir: ## mandatory
+##    agent_url: ## optional, defaults to: <master_url>/jnlpJars/agent.jar
+##    node_url: ## optional, defaults to: <master_url>/computer/<node_name>/slave-agent.jnlp
+##    default_params: true/false ## optional, can be used to disable all default agent params, true on default
+##    params: ## optional, defaults to empty
+##  service: ## optional, properly defaulted
 ##  disable_winssh: true ## optional, defaults to false
 ##  enable_default_java: true ## optional, defaults to false
 ##  default_java_extra_args: ## optional, defaults to empty
 ##    version: '8.232.9'
+
+  - smabot.windows.normalize_jenkins_slave_args:
+    register: _tmp_normres
+
+  - set_fact:
+      jenkins_slave_args_normed: "{{ _tmp_normres.normalized }}"
+
 
   - import_role:
       name: smabot.windows.win_capability
@@ -15,7 +32,7 @@
         cap_args: 
           caps: .*openssh.*
           state: absent
-    when: jenkins_slave_args.disable_winssh | default(False, True)
+    when: jenkins_slave_args_normed.disable_winssh
 
 
     ## default java deselected
@@ -37,7 +54,7 @@
             enable default java installation by setting 
             jenkins_slave_args.enable_default_java to true
 
-    when: not (jenkins_slave_args.enable_default_java | default(False, True))
+    when: not jenkins_slave_args_normed.enable_default_java
 
 
     ## default java selected
@@ -46,10 +63,40 @@
       - set_fact:
           _tmp_java_inst_args: >-
             {{ { 'name': 'adoptopenjdk8jre', 'state': 'present' } 
-             | combine(jenkins_slave_args.default_java_extra_args | default({}, True)) }}
+             | combine(jenkins_slave_args_normed.default_java_extra_args) }}
 
       - name: install default java runtime for jenkins
         chocolatey.chocolatey.win_chocolatey: "{{ _tmp_java_inst_args }}"
 
-    when: jenkins_slave_args.enable_default_java | default(False, True)
+    when: jenkins_slave_args_normed.enable_default_java
+
+
+    ## handle jenkins slave as win service
+  - set_fact:   
+      _tmp_myrole: "{{ role_path }}"
+
+  - import_role:
+      name: winservice_script
+    vars:
+      winservice_script_args:
+        ## note: auto determinating abs-path does not work for 
+        ##   git-bash as it is not added to $PATH
+        ##
+        ## update: use now default interperter powershell instead
+        ##interpreter: git-bash
+        ##interpreter: C:\Program Files\Git\git-bash.exe
+
+        source: 
+          ##
+          ## note: it seems this is expanded late for some reason, so 
+          ##   role_path will actually point to imported role, not 
+          ##   calling role
+          ##
+          ## note: it seems this is expanded late for some reason, so 
+          ##root: "{{ role_path }}"
+          root: "{{ _tmp_myrole }}"
+          src: run_jenkinsslave_win.ps1.j2
+          main_script: run_jenkinsslave_win.ps1
+
+        service: "{{ jenkins_slave_args_normed.service }}"
 
