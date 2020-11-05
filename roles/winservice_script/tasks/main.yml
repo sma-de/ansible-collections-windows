@@ -23,9 +23,6 @@
 ##       display_name:
 ##     config: ## optional
 
-  - debug:
-      var: winservice_script_args
-
   - smabot.windows.normalize_winservice_script_args:
     register: _tmp_normres
 

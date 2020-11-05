@@ -2,12 +2,13 @@
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
+import pathlib
 
 from ansible.errors import AnsibleOptionsError
-##from ansible.module_utils.six import iteritems, string_types
+from ansible.module_utils.six import iteritems, string_types
 
 from ansible_collections.smabot.base.plugins.module_utils.plugins.config_normalizing.base import ConfigNormalizerBaseMerger, NormalizerBase, DefaultSetterConstant, DefaultSetterFmtStrCfg, DefaultSetterFmtStrSubCfg
-##from ansible_collections.smabot.base.plugins.module_utils.utils.dicting import get_subdict, SUBDICT_METAKEY_ANY
+from ansible_collections.smabot.base.plugins.module_utils.utils.dicting import setdefault_none
 
 from ansible_collections.smabot.base.plugins.module_utils.utils.utils import ansible_assert
 
@@ -28,6 +29,10 @@ class ConfigRootNormalizer(NormalizerBase):
            'default_java_extra_args', DefaultSetterConstant({})
         )
 
+        self._add_defaultsetter(kwargs, 
+           'use_gitbash', DefaultSetterConstant(None)
+        )
+
         subnorms = kwargs.setdefault('sub_normalizers', [])
         subnorms += [
           JenkinsAgentNormalizer(pluginref),
@@ -36,6 +41,36 @@ class ConfigRootNormalizer(NormalizerBase):
 
         super(ConfigRootNormalizer, self).__init__(pluginref, *args, **kwargs)
 
+    def _handle_specifics_presub(self, cfg, my_subcfg, cfgpath_abs):
+        use_gb = my_subcfg['use_gitbash']
+
+        if use_gb:
+            use_default = False
+
+            if not isinstance(use_gb, string_types):
+                ## if no concrete path is specified, use default path
+                use_gb = 'C:\\Program Files\\Git'
+                use_default = True
+
+            stat = self.pluginref.exec_module(
+               'ansible.windows.win_stat', modargs={'path': use_gb}
+            )
+
+            if not stat['stat']['exists'] or not stat['stat']['isdir']:
+                tmp = 'user specified'
+
+                if use_default:
+                    tmp = 'default'
+
+                raise AnsibleOptionsError(
+                   "git-bash {} install path '{}' is invalid, make sure that"\
+                   " git-bash is installed before using this role and that"\
+                   " the correct install path is used".format(tmp, use_gb)
+                )
+
+            my_subcfg['use_gitbash'] = use_gb
+
+        return my_subcfg
 
 class JenkinsAgentNormalizer(NormalizerBase):
 
@@ -117,6 +152,21 @@ class ServiceCreateNormalizer(NormalizerBase):
             )
 
         my_subcfg['arguments'] = [cfg['agent']['secret']]
+
+        gb_path = cfg['use_gitbash']
+
+        if gb_path:
+
+            ## if we use gitbash make sure it is on the path so that stuff 
+            ## like ssh-agent can be found by jenkins
+            cpadd = setdefault_none(
+               setdefault_none(my_subcfg, 'custom_pathvar', {}), 'append', []
+            )
+
+            cpadd.append(
+               str(pathlib.PureWindowsPath(gb_path) / 'usr' / 'bin' )
+            )
+
         return my_subcfg
 
 

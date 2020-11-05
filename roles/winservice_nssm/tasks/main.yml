@@ -21,13 +21,14 @@
     win_chocolatey: "{{ _tmp_targs }}"
 
 
+##  - debug:
+##      var: winservice_nssm_args.service.create
+
+
   - name: >-
       create win service wrapper ==> {{ winservice_nssm_args.service.create.name }}
 
-    win_nssm: "{{ winservice_nssm_args.service.create }}"
-
-    # TODO: win_nssm does not set changed_when correctly atm, in this case it seems better to report the few changed cases as green instead of the many green cases as changed, if this is someday fixed in ansible, remove this workaround
-    changed_when: false
+    community.windows.win_nssm: "{{ winservice_nssm_args.service.create }}"
 
 
   - set_fact:

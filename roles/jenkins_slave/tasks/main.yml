@@ -1,6 +1,9 @@
 ---
 
 ##jenkins_slave_args:
+##  ## if set assumes that git-bash is installed and use as "distro" base for utilities like ssh-agent and such
+##  use_gitbash: true  ## simply set to true to use default path, defaults to false
+##  use_gitbash: C:\foo\bar\baz  ## alternatively one can specify a concret path where git bash can be found
 ##  agent: ## mandatory 
 ##    master_url: ## mandatory
 ##    node_name: ## mandatory
