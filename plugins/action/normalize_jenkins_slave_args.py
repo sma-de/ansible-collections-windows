@@ -167,12 +167,12 @@ class ServiceCreateNormalizer(NormalizerBase):
                 t2 = tmp.get(pv, None)
 
                 if t2:
+                    tmp = pv
                     break
 
-            tmp = t2
-            assert tmp, "Failed to find $PATH var in environment"
+            assert t2, "Failed to find $PATH var in environment"
 
-            appenv = tmp \
+            appenv[tmp] = t2 \
                 + ';' + str(pathlib.PureWindowsPath(gb_path) / 'usr' / 'bin' )
 
         return my_subcfg
