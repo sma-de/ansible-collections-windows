@@ -160,7 +160,19 @@ class ServiceCreateNormalizer(NormalizerBase):
             ## like ssh-agent can be found by jenkins
             appenv = setdefault_none(my_subcfg, 'app_environment', {})
 
-            appenv = self.pluginref.get_ansible_var('ansible_env')['PATH'] \
+            tmp = self.pluginref.get_ansible_var('ansible_env')
+            t2 = None
+
+            for pv in ['PATH', 'Path']:
+                t2 = tmp.get(pv, None)
+
+                if t2:
+                    break
+
+            tmp = t2
+            assert tmp, "Failed to find $PATH var in environment"
+
+            appenv = tmp \
                 + ';' + str(pathlib.PureWindowsPath(gb_path) / 'usr' / 'bin' )
 
         return my_subcfg
