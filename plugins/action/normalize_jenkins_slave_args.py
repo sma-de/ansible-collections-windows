@@ -156,16 +156,12 @@ class ServiceCreateNormalizer(NormalizerBase):
         gb_path = cfg['use_gitbash']
 
         if gb_path:
-
             ## if we use gitbash make sure it is on the path so that stuff 
             ## like ssh-agent can be found by jenkins
-            cpadd = setdefault_none(
-               setdefault_none(my_subcfg, 'custom_pathvar', {}), 'append', []
-            )
+            appenv = setdefault_none(my_subcfg, 'app_environment', {})
 
-            cpadd.append(
-               str(pathlib.PureWindowsPath(gb_path) / 'usr' / 'bin' )
-            )
+            appenv = pluginref.get_ansible_var('ansible_env')['PATH'] \
+                + ';' + str(pathlib.PureWindowsPath(gb_path) / 'usr' / 'bin' )
 
         return my_subcfg
 
