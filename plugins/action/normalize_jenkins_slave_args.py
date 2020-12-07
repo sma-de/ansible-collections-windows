@@ -36,7 +36,7 @@ class ConfigRootNormalizer(NormalizerBase):
         subnorms = kwargs.setdefault('sub_normalizers', [])
         subnorms += [
           JenkinsAgentNormalizer(pluginref),
-          ServiceCreateNormalizer(pluginref),
+          ServiceNormalizer(pluginref),
         ]
 
         super(ConfigRootNormalizer, self).__init__(pluginref, *args, **kwargs)
@@ -71,6 +71,7 @@ class ConfigRootNormalizer(NormalizerBase):
             my_subcfg['use_gitbash'] = use_gb
 
         return my_subcfg
+
 
 class JenkinsAgentNormalizer(NormalizerBase):
 
@@ -118,13 +119,46 @@ class JenkinsAgentNormalizer(NormalizerBase):
         return my_subcfg
 
 
-class ServiceCreateNormalizer(NormalizerBase):
+class ServiceNormalizer(NormalizerBase):
 
     def __init__(self, pluginref, *args, **kwargs):
         self._add_defaultsetter(kwargs, 
            'name', DefaultSetterConstant('jenkins_slave')
         )
 
+        subnorms = kwargs.setdefault('sub_normalizers', [])
+        subnorms += [
+          ServiceCreateNormalizer(pluginref),
+        ]
+
+        super(ServiceNormalizer, self).__init__(
+           pluginref, *args, **kwargs
+        )
+
+    @property
+    def config_path(self):
+        return ['service', 'service']
+
+    def _handle_specifics_presub(self, cfg, my_subcfg, cfgpath_abs):
+        gb_path = cfg['use_gitbash']
+
+        if gb_path:
+            ## if we use gitbash make sure it is on the path so that stuff 
+            ## like ssh-agent can be found by jenkins
+            cpadd = setdefault_none(
+               setdefault_none(my_subcfg, 'custom_pathvar', {}), 'append', []
+            )
+
+            cpadd.append(
+               str(pathlib.PureWindowsPath(gb_path) / 'usr' / 'bin' )
+            )
+
+        return my_subcfg
+
+
+class ServiceCreateNormalizer(NormalizerBase):
+
+    def __init__(self, pluginref, *args, **kwargs):
         self._add_defaultsetter(kwargs, 'display_name', 
            DefaultSetterFmtStrCfg('JenkinsSlave {agent[node_name]}')
         )
@@ -142,7 +176,7 @@ class ServiceCreateNormalizer(NormalizerBase):
 
     @property
     def config_path(self):
-        return ['service', 'service', 'create']
+        return ['create']
 
     def _handle_specifics_presub(self, cfg, my_subcfg, cfgpath_abs):
         if 'arguments' in my_subcfg:
@@ -152,29 +186,6 @@ class ServiceCreateNormalizer(NormalizerBase):
             )
 
         my_subcfg['arguments'] = [cfg['agent']['secret']]
-
-        gb_path = cfg['use_gitbash']
-
-        if gb_path:
-            ## if we use gitbash make sure it is on the path so that stuff 
-            ## like ssh-agent can be found by jenkins
-            appenv = setdefault_none(my_subcfg, 'app_environment', {})
-
-            tmp = self.pluginref.get_ansible_var('ansible_env')
-            t2 = None
-
-            for pv in ['PATH', 'Path']:
-                t2 = tmp.get(pv, None)
-
-                if t2:
-                    tmp = pv
-                    break
-
-            assert t2, "Failed to find $PATH var in environment"
-
-            appenv[tmp] = t2 \
-                + ';' + str(pathlib.PureWindowsPath(gb_path) / 'usr' / 'bin' )
-
         return my_subcfg
 
 

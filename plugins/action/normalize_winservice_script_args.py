@@ -84,7 +84,7 @@ class ConfigRootNormalizer(NormalizerBase):
 
         ## compute dest dir
         destdir = pathlib.PureWindowsPath(my_subcfg['rootdir']) \
-                / my_subcfg['service']['service']['create']['name']
+                / my_subcfg['service']['service']['name']
 
         my_subcfg['destdir'] = str(destdir)
         return my_subcfg

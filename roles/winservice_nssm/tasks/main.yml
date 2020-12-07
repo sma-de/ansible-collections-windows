@@ -3,8 +3,10 @@
 ## winservice_nssm_args:
 ##   nssm: ## optional, empty default
 ##   service: ## mandatory
+##     name: ## mandatory
+##     user: ## optional, defaults to LocalSystem
+##     custom_pathvar: ## optional
 ##     create: ## mandatory
-##       name:
 ##       application:
 ##       arguments:
 ##       working_directory:
@@ -12,31 +14,29 @@
 ##       display_name:
 ##     config: ## optional
 
+  - smabot.windows.normalize_winservice_nssm_args:
+    register: _tmp_normres
+
+    ## note: for correctly resolving $PATH var during normalisation 
+    ##   we must run this as the service user
+    become: yes
+    become_user: >-
+      {{ winservice_nssm_args.service.user | default('System', True) }}
+
   - set_fact:
-      _tmp_targs: >-
-         {{ { 'name': 'nssm', 'state': 'latest' } 
-          | combine(winservice_nssm_args.nssm | default({}, True)) }}
+      winservice_nssm_args_normed: "{{ _tmp_normres.normalized }}"
+
 
   - name: ensure nssm is avaible
-    win_chocolatey: "{{ _tmp_targs }}"
-
-
-##  - debug:
-##      var: winservice_nssm_args.service.create
+    win_chocolatey: "{{ winservice_nssm_args_normed.nssm }}"
 
 
   - name: >-
-      create win service wrapper ==> {{ winservice_nssm_args.service.create.name }}
+      create win service wrapper ==> {{ winservice_nssm_args_normed.service.create.name }}
+    community.windows.win_nssm: "{{ winservice_nssm_args_normed.service.create }}"
 
-    community.windows.win_nssm: "{{ winservice_nssm_args.service.create }}"
-
-
-  - set_fact:
-      _tmp_targs: >-
-         {{ { 'name': winservice_nssm_args.service.create.name, 'state': 'started', 'start_mode': 'auto' } 
-          | combine(winservice_nssm_args.service.config | default({}, True)) }}
 
   - name: >-
-      configure new win service ==> {{ winservice_nssm_args.service.create.name }}
-    win_service: "{{ _tmp_targs }}"
+      configure new win service ==> {{ winservice_nssm_args_normed.service.create.name }}
+    win_service: "{{ winservice_nssm_args_normed.service.config }}"
 
