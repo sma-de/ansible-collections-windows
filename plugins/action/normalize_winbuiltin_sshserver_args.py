@@ -19,6 +19,7 @@ class ConfigRootNormalizer(NormalizerBase):
         subnorms = kwargs.setdefault('sub_normalizers', [])
         subnorms += [
           FirewallNormalizer(pluginref),
+          ServiceNormalizer(pluginref),
         ]
 
         super(ConfigRootNormalizer, self).__init__(pluginref, *args, **kwargs)
@@ -43,6 +44,27 @@ class FirewallNormalizer(NormalizerBase):
     @property
     def config_path(self):
         return ['firewall']
+
+
+
+class ServiceNormalizer(NormalizerBase):
+
+    def __init__(self, pluginref, *args, **kwargs):
+        self._add_defaultsetter(kwargs, 
+           'state', DefaultSetterConstant('started')
+        )
+
+        self._add_defaultsetter(kwargs, 
+           'password', DefaultSetterConstant('')
+        )
+
+        super(ServiceNormalizer, self).__init__(
+           pluginref, *args, **kwargs
+        )
+
+    @property
+    def config_path(self):
+        return ['service']
 
 
 

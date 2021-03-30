@@ -1,6 +1,9 @@
 ---
 
 ## winbuiltin_sshserver_args:
+##   service: ## optional
+##     state: ## optional, defaults to started
+##     password: ## optional, defaults to empty string
 ##   firewall: ## optional
 ##     state: ## optional, defaults to present
 ##     enabled: ## optional, defaults to true
@@ -31,7 +34,6 @@
       expect_max: 1
     register: _tmp_res_query
 
-
   - set_fact:
       _tmp_args_in: >-
         {{ ( _tmp_res_query.rule | default({}, True) ) 
@@ -39,22 +41,26 @@
              winbuiltin_sshserver_args_normed.firewall, recursive=True
          ) }}
 
-
     ## TODO: this was unexpectly yellow on the first time, but there should be no changes, so why??
   - name: configure firewall for ssh server traffic
     community.windows.win_firewall_rule: "{{ _tmp_args_in }}"
 
-      ## ## handle corresponding win service
-      ## Get-Service *sshd*
-      ## 
-      ##   - name: >-
-      ##       create win service wrapper ==> {{ winservice_nssm_args_normed.service.create.name }}
-      ##     community.windows.win_nssm: "{{ winservice_nssm_args_normed.service.create }}"
-      ## 
-      ## 
-      ## - name: Set service startup mode to auto and ensure it is started
-      ##   win_service:
-      ##     name: spooler
-      ##     start_mode: auto
-      ##     state: started
+
+  - name: query ssh server winservice
+    ansible.windows.win_service:
+      name: sshd
+    register: _tmp_res_query
+
+  - set_fact:
+      _tmp_args_in: >-
+        {{ ( _tmp_res_query
+             | smabot.base.subdict(keys_keep=[
+              'name', 'display_name', 'description', 
+              'dependencies', 'desktop_interact', 'path', 
+              'start_mode', 'username'
+             ]) 
+           ) | combine(winbuiltin_sshserver_args_normed.service) }}
+
+  - name: manage ssh server winservice
+    ansible.windows.win_service: "{{ _tmp_args_in }}"
 
