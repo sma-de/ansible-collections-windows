@@ -15,14 +15,17 @@
   - set_fact:
       winbuiltin_sshserver_args_normed: "{{ _tmp_normres.normalized }}"
 
-##  - import_role:
-##      name: smabot.windows.win_capability
-##    vars:
-##      win_capability_args:
-##        task_name: make sure openssh server windows feature is enabled
-##        cap_args: 
-##          caps: .*openssh.*server.*
-##          state: present
+
+    # TODO: handle real install case
+  - import_role:
+      name: smabot.windows.win_capability
+    vars:
+      win_capability_args:
+        task_name: make sure openssh server windows feature is enabled
+        cap_args: 
+          caps: "*openssh*server*"
+          state: present
+
 
     ##
     ## note: normally should the install step above already create a 

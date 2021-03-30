@@ -93,13 +93,6 @@ class ActionModule(ActionBaseWin):
 
                 c = nc
 
-            if not c.get('version', False) and state == 'present':
-                raise AnsibleOptionsError(
-                   "Bad param '{}': when installing capabilities"\
-                   " (state == present) a version must be"\
-                   " specified".format(c['name'])
-                )
-
             tmp.append(c)
 
         caps = tmp
@@ -125,7 +118,7 @@ class ActionModule(ActionBaseWin):
             ##
             ## check if caps are already installed
             ##
-            cmd = ['Get-WindowsCapability', '-Online']
+            cmd = ['Get-WindowsCapability', '-Online', '-Name', cap_name]
 
             if state == 'absent':
                 ##
@@ -140,8 +133,6 @@ class ActionModule(ActionBaseWin):
                 ##   query the local machine, which should always be fine
                 ##
                 cmd += ['-LimitAccess', '| where state -eq "Installed"']
-
-            cmd += ['| where Name -Match "{}"'.format(cap_name)]
 
             tmp = self.exec_powershell_script(' '.join(cmd), 
                data_return=True, on_error=self._on_getcap_error
@@ -169,19 +160,11 @@ class ActionModule(ActionBaseWin):
                 cap_info[ec['Name']] = { 'details': ec }
 
             if state == 'present':
-                if len(tmp) > 1:
-                    raise AnsibleOptionsError(
-                       "Given caps name '{}' is ambigious (matches more"\
-                       " than one capability). For installing caps"\
-                       " (state == present) name must match exactly one"\
-                       " capability.".format(cap_name)
-                    )
-
                 new_caps = []
 
                 ## filter out already installed caps
                 for fc in tmp:
-                    if CAP_STATES.get(fc['state'], 'UNKNOWN') != 'INSTALLED':
+                    if CAP_STATES.get(fc['State'], 'UNKNOWN') != 'INSTALLED':
                         new_caps.append(fc)
 
                 if not new_caps:
@@ -189,6 +172,15 @@ class ActionModule(ActionBaseWin):
                     continue
 
                 ## install new caps
+                if len(tmp) > 1:
+                    # TODO: support latest mode where we auto select latest version (but still assert that name base is the same for all possible candidates
+                    raise AnsibleOptionsError(
+                       "Given caps name '{}' is ambigious (matches more"\
+                       " than one capability). For installing caps"\
+                       " (state == present) name must match exactly one"\
+                       " capability.".format(cap_name)
+                    )
+
                 result['changed'] = True
                 ansible_assert(False, "TODO: handle installing new caps")
                 continue
