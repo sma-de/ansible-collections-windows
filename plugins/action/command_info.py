@@ -54,6 +54,11 @@ class ActionModule(ActionBaseWinPowerCmdDataReturn):
         return 'command_info'
 
     @property
+    def return_key_single(self):
+        return 'command_info_single'
+
+
+    @property
     def extra_args(self):
         tmp = super(ActionModule, self).extra_args
 

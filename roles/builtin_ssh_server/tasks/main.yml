@@ -1,0 +1,60 @@
+---
+
+## winbuiltin_sshserver_args:
+##   firewall: ## optional
+##     state: ## optional, defaults to present
+##     enabled: ## optional, defaults to true
+##     <other passthrough interface params> ## optional
+
+  - smabot.windows.normalize_winbuiltin_sshserver_args:
+    register: _tmp_normres
+
+  - set_fact:
+      winbuiltin_sshserver_args_normed: "{{ _tmp_normres.normalized }}"
+
+##  - import_role:
+##      name: smabot.windows.win_capability
+##    vars:
+##      win_capability_args:
+##        task_name: make sure openssh server windows feature is enabled
+##        cap_args: 
+##          caps: .*openssh.*server.*
+##          state: present
+
+    ##
+    ## note: normally should the install step above already create a 
+    ##   proper firewall rule, we will query it here as base
+    ##
+  - name: query ssh server default rule
+    smabot.windows.query_firewall_rules:
+      search_query: "*ssh*"
+      expect_max: 1
+    register: _tmp_res_query
+
+
+  - set_fact:
+      _tmp_args_in: >-
+        {{ ( _tmp_res_query.rule | default({}, True) ) 
+         | combine(
+             winbuiltin_sshserver_args_normed.firewall, recursive=True
+         ) }}
+
+
+    ## TODO: this was unexpectly yellow on the first time, but there should be no changes, so why??
+  - name: configure firewall for ssh server traffic
+    community.windows.win_firewall_rule: "{{ _tmp_args_in }}"
+
+      ## ## handle corresponding win service
+      ## Get-Service *sshd*
+      ## 
+      ##   - name: >-
+      ##       create win service wrapper ==> {{ winservice_nssm_args_normed.service.create.name }}
+      ##     community.windows.win_nssm: "{{ winservice_nssm_args_normed.service.create }}"
+      ## 
+      ## 
+      ## - name: Set service startup mode to auto and ensure it is started
+      ##   win_service:
+      ##     name: spooler
+      ##     start_mode: auto
+      ##     state: started
+
