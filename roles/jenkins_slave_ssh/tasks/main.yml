@@ -27,12 +27,12 @@
 ##       jenkins_slave_args_normed: "{{ _tmp_normres.normalized }}"
 ## 
 
-  - import_role:
-      name: smabot.windows.builtin_ssh_server
-
-# TODO: pass through args
-##    vars:
-##      winbuiltin_sshserver_args:
+##   - import_role:
+##       name: smabot.windows.builtin_ssh_server
+## 
+## # TODO: pass through args
+## ##    vars:
+## ##      winbuiltin_sshserver_args:
 
 
     ## TODO: do java, unify with other jenkins slave role
@@ -73,4 +73,11 @@
     ##
 
     ## TODO: mklink jenkins root dir to c: when on different drive, because windows docker volume mapping only works with C: drive
+  - name: todo
+    smabot.windows.fs_link:
+      link_path: c:\jenkins
+      target_path: f:\jenkins
+      overwrite: true
+      state: present
+      ##force: true
 

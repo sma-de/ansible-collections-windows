@@ -31,7 +31,7 @@ class ActionBaseWin(BaseAction):
     def exec_powershell_script(self, finalcmd, preprocess=None, 
         extra_psargs=None, keyfilter=None, keys_exclude=False, 
         data_return=False, expect_min=None, expect_max=None, 
-        force_unlist=False, **kwargs
+        force_unlist=False, cmd_exe=False, **kwargs
     ):
         script = preprocess or ''
 
@@ -43,6 +43,14 @@ class ActionBaseWin(BaseAction):
             script += "{} | ConvertTo-Json".format(finalcmd)
         else:
             script += "{}".format(finalcmd)
+
+        if cmd_exe:
+            if len(script.split('\n')) > 1:
+                raise AnsibleModuleError(
+                  "cmd_exe psmode can only be used for oneliners"
+                )
+
+            script = 'cmd /c ' + script
 
         modargs = extra_psargs or {}
 
