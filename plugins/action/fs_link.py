@@ -177,6 +177,12 @@ class ActionModule(ActionBaseWin):
 
         trgt_stat = trgt_stat['stat']
 
+        if pathlib.PureWindowsPath(trgt_stat['path']) == pathlib.PureWindowsPath(link_stat['path']):
+            raise AnsibleOptionsError(
+               "Given link and target path are identical,"\
+               " this does not make sense"
+            )
+
         if not trgt_stat['exists']:
             raise AnsibleOptionsError(
                "Invalid target path param: path must exists on target"\

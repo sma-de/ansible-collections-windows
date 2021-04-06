@@ -1,38 +1,42 @@
 ---
 
-## TODO:
-## ##jenkins_slave_args:
-## ##  ## if set assumes that git-bash is installed and use as "distro" base for utilities like ssh-agent and such
-## ##  use_gitbash: true  ## simply set to true to use default path, defaults to false
-## ##  use_gitbash: C:\foo\bar\baz  ## alternatively one can specify a concret path where git bash can be found
-## ##  agent: ## mandatory 
-## ##    master_url: ## mandatory
-## ##    node_name: ## mandatory
-## ##    secret: ## mandatory
-## ##    workdir: ## mandatory
-## ##    agent_url: ## optional, defaults to: <master_url>/jnlpJars/agent.jar
-## ##    node_url: ## optional, defaults to: <master_url>/computer/<node_name>/slave-agent.jnlp
-## ##    default_params: true/false ## optional, can be used to disable all default agent params, true on default
-## ##    params: ## optional, defaults to empty
-## ##  service: ## optional, properly defaulted
-## ##  disable_winssh: true ## optional, defaults to false
-## ##  enable_default_java: true ## optional, defaults to false
-## ##  default_java_extra_args: ## optional, defaults to empty
-## ##    version: '8.232.9'
-## 
-##   - smabot.windows.normalize_jenkins_slave_args:
-##     register: _tmp_normres
-## 
-##   - set_fact:
-##       jenkins_slave_args_normed: "{{ _tmp_normres.normalized }}"
-## 
+##
+## win_jenkins_sshslave_args:
+##
+##   ssh_server: ## optional, passthrough ssh server args
+##
+##   remote_fs: ## mandatory
+##     disabled: ## optional, set it to true to disable remote fs handling completly
+##     real_path: ## absolute valid path on remote machine where the remote-fs-dir will be put
+##     link_path: ## absolute valid path on remote machine where a symlink to realpath is put, optional, defaults to c:\<real_path>
+##
+##     ## autolinking means the internal default method of creating a symlink on c: 
+##     ## drive for any realpath which lies on another drive, reason is that stuff 
+##     ## can get complicated very fast when jenkins remote-fs is not on c: drive, 
+##     ## first of all one need additional drive switching commands in jenkins node 
+##     ## setting (not that bad), another much more complex issue is that current 
+##     ## win docker and jenkins docker plugin volume mapping only work properly if 
+##     ## volumes are on c: drive, which means jenkins workspaces must be on c: 
+##     ## which means remote-fs must be on c:
+##     no_autolinking: ## optionally set this to disable autolinking method completly, defaults to False
+##
+##  TODO:
+##  enable_default_java: true ## optional, defaults to false
+##  default_java_extra_args: ## optional, defaults to empty
+##    version: '8.232.9'
 
-##   - import_role:
-##       name: smabot.windows.builtin_ssh_server
-## 
-## # TODO: pass through args
-## ##    vars:
-## ##      winbuiltin_sshserver_args:
+
+  - smabot.windows.normalize_jenkins_slave_ssh_args:
+    register: _tmp_normres
+
+  - set_fact:
+      jenkins_sshslave_args_normed: "{{ _tmp_normres.normalized }}"
+
+
+  - import_role:
+      name: smabot.windows.builtin_ssh_server
+    vars:
+      winbuiltin_sshserver_args: "{{ jenkins_sshslave_args_normed.ssh_server }}"
 
 
     ## TODO: do java, unify with other jenkins slave role
@@ -72,12 +76,36 @@
     ##    when: jenkins_slave_args_normed.enable_default_java
     ##
 
-    ## TODO: mklink jenkins root dir to c: when on different drive, because windows docker volume mapping only works with C: drive
-  - name: todo
-    smabot.windows.fs_link:
-      link_path: c:\jenkins
-      target_path: f:\jenkins
-      overwrite: true
-      state: present
-      ##force: true
+
+  - block:
+
+      - name: assure that jenkins remote-fs exists  ==>> {{ jenkins_sshslave_args_normed.remote_fs.real_path }}
+        ansible.windows.win_file:
+          path: "{{ jenkins_sshslave_args_normed.remote_fs.real_path }}"
+          state: directory
+
+      - block:
+
+          - smabot.base.warn:
+              msg: >-
+                Neither remote-fs realpath
+                '{{ jenkins_sshslave_args_normed.remote_fs.real_path }}' nor
+                remote-fs linkpath
+                '{{ jenkins_sshslave_args_normed.remote_fs.link_path }}' are
+                on 'c:' drive. Be aware that this increases the probability
+                of issues, especially when you also use docker in jenkins.
+
+            when: jenkins_sshslave_args_normed.remote_fs._none_on_c
+
+          - name: autolinking jenkins remote-fs '{{ jenkins_sshslave_args_normed.remote_fs.real_path }}' <==> '{{ jenkins_sshslave_args_normed.remote_fs.link_path }}'
+            smabot.windows.fs_link:
+              link_path: "{{ jenkins_sshslave_args_normed.remote_fs.link_path }}"
+              target_path: "{{ jenkins_sshslave_args_normed.remote_fs.real_path }}"
+              overwrite: true
+              state: present
+              ##force: true
+
+        when: not jenkins_sshslave_args_normed.remote_fs.no_autolinking
+
+    when: jenkins_sshslave_args_normed.remote_fs
 
