@@ -1,0 +1,78 @@
+---
+
+##
+## jenkins_slave_agent_args:
+##
+##   jenkins_base: ## optional, passthrough jenkins base role args
+##
+##   ## if set assumes that git-bash is installed and use as "distro" base for utilities like ssh-agent and such
+##   use_gitbash: true  ## simply set to true to use default path, defaults to false
+##   use_gitbash: C:\foo\bar\baz  ## alternatively one can specify a concret path where git bash can be found
+##   agent: ## mandatory 
+##     master_url: ## mandatory
+##     node_name: ## mandatory
+##     secret: ## mandatory
+##     workdir: ## mandatory
+##     agent_url: ## optional, defaults to: <master_url>/jnlpJars/agent.jar
+##     node_url: ## optional, defaults to: <master_url>/computer/<node_name>/slave-agent.jnlp
+##     default_params: true/false ## optional, can be used to disable all default agent params, true on default
+##     params: ## optional, defaults to empty
+##   service: ## optional, properly defaulted
+##   disable_winssh: true ## optional, defaults to false
+##
+
+  - smabot.windows.normalize_jenkins_slave_agent_args:
+    register: _tmp_normres
+
+  - set_fact:
+      jenkins_slave_agent_args_normed: "{{ _tmp_normres.normalized }}"
+
+
+  - import_role:
+      name: smabot.windows.win_capability
+    vars:
+      win_capability_args:
+        ## note: the reason for this is, that it clashes with jenkins ssh agent: https://issues.jenkins-ci.org/browse/JENKINS-51968
+        task_name: make sure that windows builtin experimental ssh client is disabled as it currently breaks jenkins
+        cap_args: 
+          caps: .*openssh.*
+          state: absent
+    when: jenkins_slave_agent_args_normed.disable_winssh
+
+
+    ## handle java
+  - import_role:
+      name: smabot.windows.jenkins_slave_base
+    vars:
+      jenkins_slave_base_args: "{{ jenkins_slave_agent_args_normed.jenkins_base }}"
+
+
+    ## handle jenkins slave as win service
+  - set_fact:   
+      _tmp_myrole: "{{ role_path }}"
+
+  - import_role:
+      name: winservice_script
+    vars:
+      winservice_script_args:
+        ## note: auto determinating abs-path does not work for 
+        ##   git-bash as it is not added to $PATH
+        ##
+        ## update: use now default interperter powershell instead
+        ##interpreter: git-bash
+        ##interpreter: C:\Program Files\Git\git-bash.exe
+
+        source: 
+          ##
+          ## note: it seems this is expanded late for some reason, so 
+          ##   role_path will actually point to imported role, not 
+          ##   calling role
+          ##
+          ## note: it seems this is expanded late for some reason, so 
+          ##root: "{{ role_path }}"
+          root: "{{ _tmp_myrole }}"
+          src: run_jenkinsslave_win.ps1.j2
+          main_script: run_jenkinsslave_win.ps1
+
+        service: "{{ jenkins_slave_agent_args_normed.service }}"
+

@@ -3,6 +3,8 @@
 ##
 ## win_jenkins_sshslave_args:
 ##
+##   jenkins_base: ## optional, passthrough jenkins base role args
+##
 ##   ssh_server: ## optional, passthrough ssh server args
 ##
 ##   remote_fs: ## mandatory
@@ -20,11 +22,6 @@
 ##     ## which means remote-fs must be on c:
 ##     no_autolinking: ## optionally set this to disable autolinking method completly, defaults to False
 ##
-##  TODO:
-##  enable_default_java: true ## optional, defaults to false
-##  default_java_extra_args: ## optional, defaults to empty
-##    version: '8.232.9'
-
 
   - smabot.windows.normalize_jenkins_slave_ssh_args:
     register: _tmp_normres
@@ -33,50 +30,21 @@
       jenkins_sshslave_args_normed: "{{ _tmp_normres.normalized }}"
 
 
+    ## handle ssh server
   - import_role:
       name: smabot.windows.builtin_ssh_server
     vars:
       winbuiltin_sshserver_args: "{{ jenkins_sshslave_args_normed.ssh_server }}"
 
 
-    ## TODO: do java, unify with other jenkins slave role
-    ##    ## default java deselected
-    ##  - block:
-    ##
-    ##      - name: check if java is installed
-    ##        smabot.windows.command_info:
-    ##          command: java
-    ##          type: Application
-    ##        register: _res_find_java
-    ##
-    ##      - ansible.builtin.assert:
-    ##          that: >-
-    ##            ansible_env.JAVA_HOME is defined or
-    ##            _res_find_java.command_info.get('java.exe', False) is truthy
-    ##          fail_msg: >-
-    ##            windows jenkins slave needs java installed on target machine, 
-    ##            either make sure it is installed before calling this role or 
-    ##            enable default java installation by setting 
-    ##            jenkins_slave_args.enable_default_java to true
-    ##
-    ##    when: not jenkins_slave_args_normed.enable_default_java
-    ##
-    ##
-    ##    ## default java selected
-    ##  - block:
-    ##
-    ##      - set_fact:
-    ##          _tmp_java_inst_args: >-
-    ##            {{ { 'name': 'adoptopenjdk8jre', 'state': 'present' } 
-    ##             | combine(jenkins_slave_args_normed.default_java_extra_args) }}
-    ##
-    ##      - name: install default java runtime for jenkins
-    ##        chocolatey.chocolatey.win_chocolatey: "{{ _tmp_java_inst_args }}"
-    ##
-    ##    when: jenkins_slave_args_normed.enable_default_java
-    ##
+    ## handle java
+  - import_role:
+      name: smabot.windows.jenkins_slave_base
+    vars:
+      jenkins_slave_base_args: "{{ jenkins_sshslave_args_normed.jenkins_base }}"
 
 
+    ## handle remote-fs
   - block:
 
       - name: assure that jenkins remote-fs exists  ==>> {{ jenkins_sshslave_args_normed.remote_fs.real_path }}

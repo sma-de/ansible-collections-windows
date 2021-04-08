@@ -1,0 +1,50 @@
+---
+
+##
+## jenkins_slave_base_args:
+##   java:
+##     default_java:
+##       enable: ## set this to enable default java install, defaults to false
+##       args: ## optional, defaults to install a recent open jdk with latest
+##         version: '8.232.9'
+##
+
+  - smabot.windows.normalize_jenkins_slave_base_args:
+    register: _tmp_normres
+
+  - set_fact:
+      jenkins_slave_base_args_normed: "{{ _tmp_normres.normalized }}"
+
+
+    ## default java deselected
+  - block:
+
+      - name: check if java is installed
+        smabot.windows.command_info:
+          command: java
+          type: Application
+          expect_max: 1
+        register: _res_find_java
+
+      - ansible.builtin.assert:
+          that: >-
+            ansible_env.JAVA_HOME is defined or
+            _res_find_java.command_info_single is truthy
+          fail_msg: >-
+            windows jenkins slave needs java installed on target machine, 
+            either make sure it is installed before calling this role or 
+            enable default java installation by setting 
+            jenkins_slave_args.java.enable_default_java to true
+
+    when: not jenkins_slave_base_args_normed.java.default_java.enable
+
+
+    ## default java selected
+  - block:
+
+      - name: install default java runtime for jenkins
+        chocolatey.chocolatey.win_chocolatey: >-
+           {{ jenkins_slave_base_args_normed.java.default_java.args }}
+
+    when: jenkins_slave_base_args_normed.java.default_java.enable
+

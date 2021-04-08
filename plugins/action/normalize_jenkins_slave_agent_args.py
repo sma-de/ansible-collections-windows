@@ -22,19 +22,12 @@ class ConfigRootNormalizer(NormalizerBase):
         )
 
         self._add_defaultsetter(kwargs, 
-           'enable_default_java', DefaultSetterConstant(False)
-        )
-
-        self._add_defaultsetter(kwargs, 
-           'default_java_extra_args', DefaultSetterConstant({})
-        )
-
-        self._add_defaultsetter(kwargs, 
            'use_gitbash', DefaultSetterConstant(None)
         )
 
         subnorms = kwargs.setdefault('sub_normalizers', [])
         subnorms += [
+          JenkinsBaseNormalizer(pluginref),
           JenkinsAgentNormalizer(pluginref),
           ServiceNormalizer(pluginref),
         ]
@@ -71,6 +64,18 @@ class ConfigRootNormalizer(NormalizerBase):
             my_subcfg['use_gitbash'] = use_gb
 
         return my_subcfg
+
+
+class JenkinsBaseNormalizer(NormalizerBase):
+
+    def __init__(self, pluginref, *args, **kwargs):
+        super(JenkinsBaseNormalizer, self).__init__(
+           pluginref, *args, **kwargs
+        )
+
+    @property
+    def config_path(self):
+        return ['jenkins_base']
 
 
 class JenkinsAgentNormalizer(NormalizerBase):
@@ -193,8 +198,8 @@ class ActionModule(ConfigNormalizerBaseMerger):
 
     def __init__(self, *args, **kwargs):
         super(ActionModule, self).__init__(ConfigRootNormalizer(self), 
-            *args, default_merge_vars=['jenkins_slave_args_defaults'], 
-            extra_merge_vars_ans=['extra_win_jenkinsslave_config_maps'], 
+            *args, default_merge_vars=['jenkins_slave_agent_args_defaults'], 
+            extra_merge_vars_ans=['extra_win_jenkinsslave_agent_config_maps'], 
             **kwargs
         )
 
@@ -204,5 +209,5 @@ class ActionModule(ConfigNormalizerBaseMerger):
 
     @property
     def my_ansvar(self):
-        return 'jenkins_slave_args'
+        return 'jenkins_slave_agent_args'
 

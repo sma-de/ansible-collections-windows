@@ -98,7 +98,7 @@ class ActionModule(ActionBaseWinPowerCmdDataReturn):
         if not isinstance(jsonres, list):
             jsonres = [jsonres]
 
-        res = {}
+        res = []
         for jo in jsonres:
 
             ## note: for some reason powershell prefer to return stuff 
@@ -112,7 +112,7 @@ class ActionModule(ActionBaseWinPowerCmdDataReturn):
 
                 jo['CommandType'] = tmp
 
-            res[jo['Name']] = jo
+            res.append(jo)
 
         return res
 

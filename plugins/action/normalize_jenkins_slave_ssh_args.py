@@ -25,6 +25,7 @@ class ConfigRootNormalizer(NormalizerBase):
     def __init__(self, pluginref, *args, **kwargs):
         subnorms = kwargs.setdefault('sub_normalizers', [])
         subnorms += [
+          JenkinsBaseNormalizer(pluginref),
           SshServerNormalizer(pluginref),
           RemoteFsNormalizer(pluginref),
         ]
@@ -42,6 +43,18 @@ class SshServerNormalizer(NormalizerBase):
     @property
     def config_path(self):
         return ['ssh_server']
+
+
+class JenkinsBaseNormalizer(NormalizerBase):
+
+    def __init__(self, pluginref, *args, **kwargs):
+        super(JenkinsBaseNormalizer, self).__init__(
+           pluginref, *args, **kwargs
+        )
+
+    @property
+    def config_path(self):
+        return ['jenkins_base']
 
 
 class RemoteFsNormalizer(NormalizerBase):
