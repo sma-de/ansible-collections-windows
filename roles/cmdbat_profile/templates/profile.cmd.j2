@@ -1,0 +1,13 @@
+@echo off
+
+REM ::
+REM :: profiling base script, simply call any bat script inside 
+REM :: the profiling dir
+REM ::
+REM :: note that profiling scripts should be completly silent as 
+REM :: otherwise they can easily mess up expectations of programs 
+REM :: reading the cmd result (like jenkins ssh slave for example)
+REM ::
+
+for /r "{{ SMABOT_WIN_CMDBAT_PROFILEDIR }}" %%a in (*.bat *.cmd) do call "%%~a" > nul
+

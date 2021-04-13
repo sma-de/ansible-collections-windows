@@ -1,0 +1,16 @@
+@echo off
+
+REM :: TODO: determine somehow if environment is ssh or not and only do profiling when ssh == true
+
+REM ::
+REM :: fix environment for ssh, for some reason the environment inside the 
+REM :: cmd shell when doing ssh is incomplete on default when compared to 
+REM :: when calling it normally from the system, some vars (especially 
+REM :: system envvars) are missing for some reason, to fix this we can use 
+REM :: a nice little helper script provided by chocolatey which repairs 
+REM :: somehow magically the environment fast and more or less silent, 
+REM :: so there is no real harm in doing this (even for contexts where 
+REM :: it is not needed)
+REM ::
+refreshenv
+

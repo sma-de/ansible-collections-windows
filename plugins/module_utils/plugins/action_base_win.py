@@ -164,6 +164,38 @@ class ActionBaseWin(BaseAction):
         return res
 
 
+    def get_target_envvars(self, 
+        key_includes=None, key_excludes=None, single=False
+    ):
+        ansible_assert(not key_includes or not key_excludes, 
+          "key_includes and excludes params are mutually exclusive"
+        )
+
+        tmp = self.exec_powershell_script('dir env:', data_return=True)
+
+        envdict = {}
+        for ev in tmp['result_json']:
+            if key_excludes and ev['Key'] in key_excludes:
+                continue
+
+            if key_includes and ev['Key'] not in key_includes:
+                continue
+
+            envdict[ev['Key']] = ev['Value']
+
+        if single:
+            ansible_assert(len(envdict) == 1, 
+               "For querying envvars in single mode resulting dict must"\
+               " contain exactly one key, but had '{}': {}".format(
+                  len(envdict), envdict
+               )
+            )
+
+            return envdict[next(iter(envdict.keys()))]
+
+        return envdict
+
+
 class ActionBaseWinPowerCommand(ActionBaseWin):
 
     def __init__(self, *args, **kwargs):

@@ -1,0 +1,122 @@
+---
+
+##
+## smabot_win_cmdbat_profile_args:
+##   force: ## on default when autorun regkey is already set to something, this role will error out, set this to change the behaviour to simply overwriting
+##   profiling_basescript:
+##     path: ## optional, defaulted to something senseable
+##   profiling_dir: ## optional
+##     path: ## optional, defaults to something senseable
+##   profiling_scripts: ## optional, list of profiling scripts to copy over
+##
+
+  - smabot.windows.normalize_cmdbat_profile_args:
+    register: _tmp_normres
+
+  - set_fact:
+      smabot_win_cmdbat_profile_args_normed: "{{ _tmp_normres.normalized }}"
+
+
+    ## query autorun registry key, fail on default when already set 
+    ## but path does not match profile setting
+  - name: query cmdbat autorun registry key
+    ansible.windows.win_reg_stat:
+      path: HKLM:\SOFTWARE\Microsoft\Command Processor
+    register: _tmp_regkey
+
+  - block:
+
+      - ansible.builtin.fail:
+          msg: >-
+              AutoRun aka CmdBat profile property is already preset to unexpected
+              path '{{ _tmp_regkey.properties.AutoRun.value }}'. Check your target
+              machine setup or set the force option to yes to forcefully
+              overwrite the old value.
+        when: not smabot_win_cmdbat_profile_args_normed.force
+
+      - smabot.base.warn:
+          msg: >-
+            AutoRun aka CmdBat profile property is already preset to unexpected
+            path '{{ _tmp_regkey.properties.AutoRun.value }}'.
+            As force option is active it will be automatically overwritten.
+        when: smabot_win_cmdbat_profile_args_normed.force
+
+    when: >-
+      _tmp_regkey.properties.get('AutoRun', {}).get('value', None)
+      and _tmp_regkey.properties.AutoRun.value != smabot_win_cmdbat_profile_args_normed.profiling_basescript._path_quoted
+
+
+    ##
+    ## Caution: You play with fire here!
+    ##
+    ## The thing with cmdbat profiling is that if your profile reg key 
+    ## value is bad (script does not exists or exists but does not run 
+    ## cleanly (exit code != 0)), that this can mess up vary much of 
+    ## your windows system, many ansible modules included (win_copy 
+    ## and win_template for example), as they seems to also use cmdbat 
+    ## under the hood and as automatic system obviously rely on rc 
+    ## being zero on return,
+    ##
+    ## to lower the chance of such evil traps we will unset the autorun 
+    ## key here at this point, where we exactly know that we will set 
+    ## it to our value later anyway, even then there is plenty of 
+    ## opportunity to semi-kill your target system with bad profiling 
+    ## but at least it should be much less likely that this play messes 
+    ## itself up in such a way, that rerunning it fails because 
+    ## win_copy and co do not work anymore
+    ##
+  - name: unset old autorun registry key
+    ansible.windows.win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\Command Processor
+      name: AutoRun
+      state: absent
+      delete_key: no
+    changed_when: false
+
+
+    ## publish profile dir so other roles / plays can add stuff there
+  - set_fact:
+      SMABOT_WIN_CMDBAT_PROFILEDIR: >-
+        {{ smabot_win_cmdbat_profile_args_normed.profiling_dir.path }}
+
+
+  - name: assure profiling base dir exists
+    ansible.windows.win_file:
+      state: directory
+      path: >-
+        {{ smabot_win_cmdbat_profile_args_normed.profiling_basescript.path 
+         | win_dirname }}
+
+    ## TODO: set per base profile script a envvar with profile dir??
+  - name: create profiling base script  ==>>  {{ smabot_win_cmdbat_profile_args_normed.profiling_basescript.path }}
+    ansible.windows.win_template:
+      src: profile.cmd.j2
+      dest: "{{ smabot_win_cmdbat_profile_args_normed.profiling_basescript.path }}"
+      force: true
+
+
+  - name: set autorun registry key to profiling base script
+    ansible.windows.win_regedit:
+      path: HKLM:\SOFTWARE\Microsoft\Command Processor
+      name: AutoRun
+      data: "{{ smabot_win_cmdbat_profile_args_normed.profiling_basescript._path_quoted }}"
+      type: string
+      state: present
+    changed_when: >-
+      not _tmp_regkey.properties.get('AutoRun', {}).get('value', None)
+      or _tmp_regkey.properties.AutoRun.value != smabot_win_cmdbat_profile_args_normed.profiling_basescript._path_quoted
+
+
+    ## create profiling script.d and fill it with profiling scripts
+  - name: assure that profile.d dir '{{ smabot_win_cmdbat_profile_args_normed.profiling_dir.path }}' exists
+    ansible.windows.win_file:
+      path: "{{ smabot_win_cmdbat_profile_args_normed.profiling_dir.path }}"
+      state: directory
+
+
+  - import_role:
+      name: smabot.base.template_recursive
+    vars:
+      template_recursive_args: >-
+        {{ smabot_win_cmdbat_profile_args_normed.profiling_scripts }}
+

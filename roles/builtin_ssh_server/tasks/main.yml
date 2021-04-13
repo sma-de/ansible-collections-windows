@@ -1,6 +1,8 @@
 ---
 
+##
 ## winbuiltin_sshserver_args:
+##   cmdbat_profile: ## optional
 ##   service: ## optional
 ##     state: ## optional, defaults to started
 ##     password: ## optional, defaults to empty string
@@ -8,12 +10,27 @@
 ##     state: ## optional, defaults to present
 ##     enabled: ## optional, defaults to true
 ##     <other passthrough interface params> ## optional
+##
 
   - smabot.windows.normalize_winbuiltin_sshserver_args:
     register: _tmp_normres
 
   - set_fact:
       winbuiltin_sshserver_args_normed: "{{ _tmp_normres.normalized }}"
+
+
+## TODO: activate shell profiling, this depends on the shell used
+##     ## note: this depends on chocolatey being installed on target as the use env reload mechanism is actually not builtin but provided by choco
+##  - name: make sure chocolatey is avaible
+##    chocolatey.chocolatey.win_chocolatey:
+##      name: chocolatey
+##      state: present
+## 
+##   - import_role:
+##       name: smabot.windows.cmdbat_profile
+##     vars:
+##       smabot_win_cmdbat_profile_args: >-
+##         {{ winbuiltin_sshserver_args_normed.cmdbat_profile }}
 
 
     # TODO: handle real install case

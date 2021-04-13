@@ -2,6 +2,7 @@
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
+import pathlib
 
 from ansible.errors import AnsibleOptionsError
 from ansible.module_utils.six import iteritems, string_types
@@ -11,6 +12,9 @@ from ansible_collections.smabot.base.plugins.module_utils.plugins.config_normali
 
 from ansible_collections.smabot.base.plugins.module_utils.utils.utils import ansible_assert
 
+from ansible_collections.smabot.windows.plugins.module_utils.plugins.config_normalizing.base import ConfigNormalizerBaseMergerWin
+from ansible_collections.smabot.base.plugins.module_utils.utils.dicting import setdefault_none
+
 
 
 class ConfigRootNormalizer(NormalizerBase):
@@ -18,12 +22,53 @@ class ConfigRootNormalizer(NormalizerBase):
     def __init__(self, pluginref, *args, **kwargs):
         subnorms = kwargs.setdefault('sub_normalizers', [])
         subnorms += [
+          CmdBatProfileNormalizer(pluginref),
           FirewallNormalizer(pluginref),
           ServiceNormalizer(pluginref),
         ]
 
         super(ConfigRootNormalizer, self).__init__(pluginref, *args, **kwargs)
 
+
+
+class CmdBatProfileNormalizer(NormalizerBase):
+
+    def __init__(self, pluginref, *args, **kwargs):
+        subnorms = kwargs.setdefault('sub_normalizers', [])
+        subnorms += [
+          CmdBatProfileSubScriptsNormalizer(pluginref),
+        ]
+
+        super(CmdBatProfileNormalizer, self).__init__(
+           pluginref, *args, **kwargs
+        )
+
+    @property
+    def config_path(self):
+        return ['cmdbat_profile']
+
+
+class CmdBatProfileSubScriptsNormalizer(NormalizerBase):
+
+    def __init__(self, pluginref, *args, **kwargs):
+        super(CmdBatProfileSubScriptsNormalizer, self).__init__(
+           pluginref, *args, **kwargs
+        )
+
+    @property
+    def config_path(self):
+        return ['profiling_scripts']
+
+    def _handle_specifics_presub(self, cfg, my_subcfg, cfgpath_abs):
+        paths = setdefault_none(my_subcfg, 'paths', {})
+
+        tmp = pathlib.PurePosixPath(self.pluginref.get_ansible_var('role_path')) \
+            / 'templates' / 'cmdbat_profiling'
+
+        tmp = str(tmp) + '/'
+
+        paths[tmp] = None
+        return my_subcfg
 
 
 class FirewallNormalizer(NormalizerBase):
@@ -68,7 +113,7 @@ class ServiceNormalizer(NormalizerBase):
 
 
 
-class ActionModule(ConfigNormalizerBaseMerger):
+class ActionModule(ConfigNormalizerBaseMergerWin):
 
     def __init__(self, *args, **kwargs):
         super(ActionModule, self).__init__(ConfigRootNormalizer(self), 
