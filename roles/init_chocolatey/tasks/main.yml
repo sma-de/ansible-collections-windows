@@ -32,6 +32,7 @@
     smabot.windows.command_info:
       command: choco
       type: Application
+      expect_max: 1
     register: _res_find_choco
 
 
@@ -41,7 +42,7 @@
     register: _res_choco_fp
 
     ## no reason applying this second test when first is enough
-    when: _res_find_choco.command_info.get('choco.exe', None) is falsy
+    when: _res_find_choco.command_info_single is falsy
 
 
   - block:
@@ -72,7 +73,7 @@
           state: absent
  
     ## run install choco script only if all existance test failed
-    when: _res_find_choco.command_info.get('choco.exe', None) is falsy and not _res_choco_fp.stat.exists
+    when: _res_find_choco.command_info_single is falsy and not _res_choco_fp.stat.exists
 
 
   - name: disable chocolatey default source
