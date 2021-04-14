@@ -2,7 +2,10 @@
 
 ##
 ## winbuiltin_sshserver_args:
-##   cmdbat_profile: ## optional
+##   shell: ## optional
+##     command: ## path or name of program to use as shell, optional, defaults to command bat
+##     use_profiling: ## enables or disables shell profiling, defaults to on
+##     profiling_args: ## optional passthrough args for profiling setup role, empty on default
 ##   service: ## optional
 ##     state: ## optional, defaults to started
 ##     password: ## optional, defaults to empty string
@@ -19,20 +22,6 @@
       winbuiltin_sshserver_args_normed: "{{ _tmp_normres.normalized }}"
 
 
-## TODO: activate shell profiling, this depends on the shell used
-##     ## note: this depends on chocolatey being installed on target as the use env reload mechanism is actually not builtin but provided by choco
-##  - name: make sure chocolatey is avaible
-##    chocolatey.chocolatey.win_chocolatey:
-##      name: chocolatey
-##      state: present
-## 
-##   - import_role:
-##       name: smabot.windows.cmdbat_profile
-##     vars:
-##       smabot_win_cmdbat_profile_args: >-
-##         {{ winbuiltin_sshserver_args_normed.cmdbat_profile }}
-
-
     # TODO: handle real install case
   - import_role:
       name: smabot.windows.win_capability
@@ -42,8 +31,8 @@
         cap_args: 
           caps: "*openssh*server*"
           state: present
-
-
+ 
+ 
     ##
     ## note: normally should the install step above already create a 
     ##   proper firewall rule, we will query it here as base
@@ -53,24 +42,24 @@
       search_query: "*ssh*"
       expect_max: 1
     register: _tmp_res_query
-
+ 
   - set_fact:
       _tmp_args_in: >-
         {{ ( _tmp_res_query.rule | default({}, True) ) 
          | combine(
              winbuiltin_sshserver_args_normed.firewall, recursive=True
          ) }}
-
+ 
     ## TODO: this was unexpectly yellow on the first time, but there should be no changes, so why??
   - name: configure firewall for ssh server traffic
     community.windows.win_firewall_rule: "{{ _tmp_args_in }}"
-
-
+ 
+ 
   - name: query ssh server winservice
     ansible.windows.win_service:
       name: sshd
     register: _tmp_res_query
-
+ 
   - set_fact:
       _tmp_args_in: >-
         {{ ( _tmp_res_query
@@ -80,7 +69,77 @@
               'start_mode', 'username'
              ]) 
            ) | combine(winbuiltin_sshserver_args_normed.service) }}
-
+ 
   - name: manage ssh server winservice
     ansible.windows.win_service: "{{ _tmp_args_in }}"
+
+
+  - block:
+
+      - block:
+
+            ##
+            ## note: this depends on chocolatey being installed on 
+            ##   target as the use env reload mechanism is actually 
+            ##   not builtin but provided by choco
+            ##
+          - name: make sure chocolatey is avaible
+            chocolatey.chocolatey.win_chocolatey:
+              name: chocolatey
+              state: present
+ 
+          - import_role:
+              name: smabot.windows.cmdbat_profile
+            vars:
+              smabot_win_cmdbat_profile_args: >-
+                {{ winbuiltin_sshserver_args_normed.shell.profiling_args }}
+
+        when: winbuiltin_sshserver_args_normed.shell.type == 'cmdbat'
+
+      - block:
+
+            ##
+            ## note: this depends on chocolatey being installed on 
+            ##   target as the use env reload mechanism is actually 
+            ##   not builtin but provided by choco
+            ##
+          - name: make sure chocolatey is avaible
+            chocolatey.chocolatey.win_chocolatey:
+              name: chocolatey
+              state: present
+ 
+          - assert:
+              that: False
+              fail_msg: "TODO: implement powershell profiling"
+
+##https://stackoverflow.com/q/17794507
+##
+##https://stackoverflow.com/q/46758437
+##
+##https://github.com/chocolatey-archive/chocolatey/blob/master/src/helpers/functions/Update-SessionEnvironment.ps1
+##
+##https://docs.chocolatey.org/en-us/create/functions/update-sessionenvironment
+##
+##https://devblogs.microsoft.com/scripting/understanding-the-six-powershell-profiles/
+##
+##"C:\Windows\System32\WindowsPowerShell\v1.0\profile.ps1"
+
+          ## - import_role:
+          ##     name: smabot.windows.powershell_profile # TODO
+          ##   vars:
+          ##     smabot_win_cmdbat_profile_args: >-
+          ##       {{ winbuiltin_sshserver_args_normed.shell.profiling_args }}
+
+        when: winbuiltin_sshserver_args_normed.shell.type == 'powershell'
+
+    when: winbuiltin_sshserver_args_normed.shell.use_profiling
+
+
+  - name: set ssh shell to  ==>>  {{ winbuiltin_sshserver_args_normed.shell.command }}
+    ansible.windows.win_regedit:
+      path: HKLM:\SOFTWARE\OpenSSH
+      name: DefaultShell
+      data: "{{ winbuiltin_sshserver_args_normed.shell.command }}"
+      type: string
+      state: present
 

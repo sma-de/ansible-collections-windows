@@ -1,0 +1,22 @@
+
+## TODO: this should only be done for ssh sessions, as it is only there the env is broken, maybe also run dependend on external env var set??
+
+## this is definitive more straigtforward, as it only uses the current ps session, but is way slower for some reason
+##$env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."   
+##Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1" > $null
+##refreshenv > $null
+
+## note: all solutions here do not work for jenkins ssh slave, as it seems to only like cmd.exe on windows slaves, not ps, and 
+## indirectly opening cmd.exe seems also a nono as this produces some output lines at startup which jenkins plugin cannot handle at all
+
+# if ( -not (Test-Path env:_ssh_envwrapper) )
+# {
+  # note: works is way faster than pure ps solution above, but has the double ending problem
+  # write-host "do env var fixing"
+  # $env:_ssh_envwrapper = "true"
+  # cmd /k "refreshenv && powershell && exit"
+  
+  # note: below seems not to work like expected unfortunately
+  # exit
+# }
+

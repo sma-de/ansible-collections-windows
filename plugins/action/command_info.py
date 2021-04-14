@@ -44,9 +44,50 @@ class ActionModule(ActionBaseWinPowerCmdDataReturn):
         if typ_filter:
             cmd += ['-type', to_pshell_array_param(typ_filter)]
 
-        cmd.append(to_pshell_array_param(self.get_taskparam('command')))
+        tmp = self.get_taskparam('command')
+
+        if not isinstance(tmp, list):
+            tmp = [tmp]
+
+        com_query = []
+
+        ##
+        ## note: the underlying get-command ps cmdlet does not like path 
+        ##   info in its queries, but we will support it by removing 
+        ##   prefix paths first and filter later with them
+        ##
+        path_filter = []
+        path_filter_all_match = []
+
+        for cmd_test in tmp:
+            t2 = cmd_test.split('\\')
+
+            if len(t2) > 1:
+                com_query.append(t2[-1])
+                path_filter.append(cmd_test)
+            else:
+                com_query.append(cmd_test)
+
+                if cmd_test[0] == '*':
+                    path_filter_all_match.append(cmd_test)
+                else:
+                    path_filter_all_match.append('*' + cmd_test)
+
+        cmd.append(to_pshell_array_param(com_query))
 
         self._final_cmd = ' '.join(cmd)
+
+        if path_filter:
+            path_filter += path_filter_all_match
+
+            t2 = []
+
+            for pf in path_filter:
+                t2.append("( $_.Source -like '{}' )".format(pf))
+
+            path_filter = ' -or '.join(t2)
+            self._final_cmd += ' | Where-Object {{ {} }}'.format(path_filter)
+
         return self._final_cmd
 
     @property

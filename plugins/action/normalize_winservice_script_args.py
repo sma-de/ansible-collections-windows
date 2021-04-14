@@ -51,21 +51,17 @@ class ConfigRootNormalizer(NormalizerBase):
         tmp = {
           'command': interpreter,
           'type': 'Application',
+          ##expect_min: 1,
+          expect_max: 1,
         }
 
         tmp = self.pluginref.run_other_action_plugin(
           command_info.ActionModule, plugin_args=tmp
         )
 
-        tmp = tmp['command_info']
+        tmp = tmp['command_info_single']
 
-        for k in ['', '.exe']:
-            t2 = tmp.get(interpreter + k, None)
-
-            if t2:
-                break
-
-        if not t2:
+        if not tmp:
             raise AnsibleOptionsError(
                "Could not determine abs-path for given interpreter"\
                " '{}'. Make sure that interpreter is installed or"\
@@ -73,7 +69,7 @@ class ConfigRootNormalizer(NormalizerBase):
                " explicitly.".format(interpreter)
             )
 
-        interpreter = t2['Path']
+        interpreter = tmp['Path']
         my_subcfg['interpreter'] = interpreter
 
         return my_subcfg
