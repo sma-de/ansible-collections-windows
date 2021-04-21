@@ -1,0 +1,60 @@
+---
+
+##
+## smabot_win_inet_basics_args:
+##   proxy: ## optional
+##     all_users: ## bool, optional, defaults to true
+##     config: ## dict or string, passed through to win_inet_proxy module, if string, assumes that this is the proxy server url
+##     forward: ## bool, optional, defaults to true, when set use this proxy settings for winhttp too
+##     auth:
+##       username:
+##       secret:
+##
+
+  - smabot.windows.normalize_smabot_win_inet_basics_args:
+    register: _tmp_normres
+
+  - set_fact:
+      smabot_win_cmdbat_profile_args_normed: "{{ _tmp_normres.normalized }}"
+
+
+  - block:
+
+      - name: configure IE proxy settings to apply to all users
+        ansible.windows.win_regedit:
+          path: HKLM:\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\Internet Settings
+          name: ProxySettingsPerUser
+          data: 0
+          type: dword
+          state: present
+        when: smabot_win_cmdbat_profile_args_normed.proxy.all_users
+
+      - name: configure IE proxy settings to apply per user
+        ansible.windows.win_regedit:
+          path: HKLM:\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\Internet Settings
+          name: ProxySettingsPerUser
+          data: 1
+          type: dword
+          state: present
+        when: not smabot_win_cmdbat_profile_args_normed.proxy.all_users
+
+
+      - name: handle IE proxy settings
+        community.windows.win_inet_proxy: >
+          {{ smabot_win_cmdbat_profile_args_normed.proxy.config }}
+  
+
+      - name: use this proxy settings for WinHTTP too
+        community.windows.win_http_proxy:
+          source: ie
+        when: smabot_win_cmdbat_profile_args_normed.proxy.forward
+
+
+      - name: set credential to use for proxy auth
+        community.windows.win_credential: >
+          {{ smabot_win_cmdbat_profile_args_normed.proxy.auth }}
+        become: yes
+        when: smabot_win_cmdbat_profile_args_normed.proxy.auth
+
+    when: smabot_win_cmdbat_profile_args_normed.get('proxy', {}).get('config', False)
+
