@@ -15,7 +15,7 @@
     register: _tmp_normres
 
   - set_fact:
-      smabot_win_cmdbat_profile_args_normed: "{{ _tmp_normres.normalized }}"
+      smabot_win_inet_basics_args_normed: "{{ _tmp_normres.normalized }}"
 
 
   - block:
@@ -27,7 +27,7 @@
           data: 0
           type: dword
           state: present
-        when: smabot_win_cmdbat_profile_args_normed.proxy.all_users
+        when: smabot_win_inet_basics_args_normed.proxy.all_users
 
       - name: configure IE proxy settings to apply per user
         ansible.windows.win_regedit:
@@ -36,25 +36,39 @@
           data: 1
           type: dword
           state: present
-        when: not smabot_win_cmdbat_profile_args_normed.proxy.all_users
+        when: not smabot_win_inet_basics_args_normed.proxy.all_users
 
 
       - name: handle IE proxy settings
         community.windows.win_inet_proxy: >
-          {{ smabot_win_cmdbat_profile_args_normed.proxy.config }}
+          {{ smabot_win_inet_basics_args_normed.proxy.config }}
   
 
       - name: use this proxy settings for WinHTTP too
         community.windows.win_http_proxy:
           source: ie
-        when: smabot_win_cmdbat_profile_args_normed.proxy.forward
+        when: smabot_win_inet_basics_args_normed.proxy.forward
 
 
-      - name: set credential to use for proxy auth
+      - name: set credential to use for proxy server  ==>>  {{ _iter_proxy_auth.key }}
         community.windows.win_credential: >
-          {{ smabot_win_cmdbat_profile_args_normed.proxy.auth }}
+          {{ _iter_proxy_auth.value }}
         become: yes
-        when: smabot_win_cmdbat_profile_args_normed.proxy.auth
+        loop: >-
+          {{ smabot_win_inet_basics_args_normed.proxy.get('auth', {}) 
+           | dict2items() }}
+        loop_control:
+          index_var: _iter_proxy_auth
 
-    when: smabot_win_cmdbat_profile_args_normed.get('proxy', {}).get('config', False)
+
+      - name: publish proxy for ansible choco usage and similar
+        set_fact:
+          SMABOT_WIN_PROXY_SETTINGS: >-
+            {{ smabot_win_inet_basics_args_normed.proxy.proxy_settings }}
+
+            
+      - debug:
+          var: SMABOT_WIN_PROXY_SETTINGS
+
+    when: smabot_win_inet_basics_args_normed.get('proxy', {}).get('config', False)
 

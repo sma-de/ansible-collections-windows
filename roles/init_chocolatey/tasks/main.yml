@@ -13,6 +13,7 @@
 ##      as it basically allows choco bootstrapping from arbitrary URLs / sources
 ##
 
+## 
 ## init_chocolatey_args:
 ##   sources:
 ##     ## if set disables the chocolatey default source
@@ -24,8 +25,6 @@
 ##   ## note: atm actually does not really set install dir (which always 
 ##   ##   uses internal default), but is only used for existence testing
 ##   install_directory: ## optional, defaults to: C:\ProgramData\chocolatey
-## 
-## 
 ## 
 
   - name: check if chocolatey is already installed by searching $PATH for exe
@@ -92,4 +91,80 @@
       {{ init_chocolatey_args.sources.sources }}
     loop_control:
       loop_var: _choco_src_iter
+
+
+  - debug:
+      var: SMABOT_WIN_PROXY_SETTINGS
+
+  - block:
+
+      - name: set proxy server to  ==>>  {{ SMABOT_WIN_PROXY_SETTINGS.https.proxy }}
+        chocolatey.chocolatey.win_chocolatey_config:
+          name: proxy
+          value: "{{ SMABOT_WIN_PROXY_SETTINGS.https.proxy }}"
+          state: present
+
+
+      - name: set proxy bypass list
+        chocolatey.chocolatey.win_chocolatey_config:
+          name: proxyBypassList
+          value: >-
+            {{ SMABOT_WIN_PROXY_SETTINGS.https.bypass_list | join(',') }}
+          state: present
+        when: SMABOT_WIN_PROXY_SETTINGS.https.get('bypass_list', False)
+
+      - name: unset proxy bypass list
+        chocolatey.chocolatey.win_chocolatey_config:
+          name: proxyBypassList
+          state: absent
+        when: not SMABOT_WIN_PROXY_SETTINGS.https.get('bypass_list', False)
+
+
+      - name: enable proxy bypass for local addresses
+        chocolatey.chocolatey.win_chocolatey_config:
+          name: proxyBypassOnLocal
+          value: "true"
+          ##value: "true "
+          state: present
+        when: SMABOT_WIN_PROXY_SETTINGS.https.get('bypass_local', False)
+
+      - name: unset proxy bypass list
+        chocolatey.chocolatey.win_chocolatey_config:
+          name: proxyBypassOnLocal
+          state: absent
+        when: not SMABOT_WIN_PROXY_SETTINGS.https.get('bypass_local', False)
+
+
+      - block:
+
+          - name: set proxy user to  ==>>  {{ SMABOT_WIN_PROXY_SETTINGS.https.auth.user }}
+            chocolatey.chocolatey.win_chocolatey_config:
+              name: proxyUser
+              value: "{{ SMABOT_WIN_PROXY_SETTINGS.https.auth.user }}"
+              state: present
+
+          - name: set proxy password
+            chocolatey.chocolatey.win_chocolatey_config:
+              name: proxyPassword
+              value: "{{ SMABOT_WIN_PROXY_SETTINGS.https.auth.password }}"
+              state: present
+
+        when: SMABOT_WIN_PROXY_SETTINGS.https.get('auth', False)
+
+
+      - block:
+
+          - name: unset proxy user
+            chocolatey.chocolatey.win_chocolatey_config:
+              name: proxyUser
+              state: absent
+
+          - name: unset proxy password
+            chocolatey.chocolatey.win_chocolatey_config:
+              name: proxyPassword
+              state: absent
+
+        when: not SMABOT_WIN_PROXY_SETTINGS.https.get('auth', False)
+
+    when: (SMABOT_WIN_PROXY_SETTINGS | default({}, true)).get('https', False)
 

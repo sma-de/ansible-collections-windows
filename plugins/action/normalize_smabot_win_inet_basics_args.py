@@ -2,6 +2,7 @@
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
+import copy
 from urllib.parse import urlparse
 
 from ansible.errors import AnsibleOptionsError
@@ -41,7 +42,6 @@ class ProxyNormalizer(NormalizerBase):
         subnorms = kwargs.setdefault('sub_normalizers', [])
         subnorms += [
           ProxyConfigNormalizer(pluginref),
-          ProxyAuthNormalizer(pluginref),
         ]
 
         super(ProxyNormalizer, self).__init__(
@@ -51,6 +51,91 @@ class ProxyNormalizer(NormalizerBase):
     @property
     def config_path(self):
         return ['proxy']
+
+    def _handle_specifics_postsub(self, cfg, my_subcfg, cfgpath_abs):
+        proxy_cfg = my_subcfg['config']
+
+        if not proxy_cfg:
+            return my_subcfg
+
+        # normalize protocol specific proxy servers
+        proxy_settings = {}
+        tmp = proxy_cfg['proxy'].split(';')
+
+        bypass = proxy_cfg.get('bypass', None)
+
+        global_sets = {}
+
+        if bypass:
+            global_sets['bypass_list'] = bypass
+            global_sets['bypass_local'] = '<local>' in bypass
+
+        for protproxy in tmp:
+            protproxy = protproxy.split('=')
+
+            assert len(protproxy) <= 2
+
+            if len(protproxy) == 1:
+                uri = protproxy[0]
+                prots = None
+            else:
+                prots, uri = protproxy
+                prots = [ prots ]
+
+            assert prots or len(tmp) == 1, \
+                "must specify protocol scheme when more than one proxy server is used"
+
+            prots = prots or ['http', 'https', 'ftp', 'socks']
+
+            for p in prots:
+                assert p not in proxy_settings, "redefining protocol proxy server"
+                t2 = { 'proxy': uri }
+                t2.update(global_sets)
+
+                proxy_settings[p] = t2
+
+        my_subcfg['proxy_settings'] = proxy_settings
+
+        # normalize proxy auth
+        proxy_auth = my_subcfg.get('auth', None)
+
+        if proxy_auth:
+
+            normed_proxy_auth = {}
+            default_auth = {}
+
+            if 'username' in proxy_auth:
+                # assume flat user, password def for all proxy types
+                default_auth = proxy_auth
+
+            for (prot, pxset) in iteritems(proxy_servers):
+
+                uri = pxset['uri']
+                tmp = copy.deepcopy(proxy_auth.get(prot, default_auth))
+
+                pxset.update({
+                  'auth': {
+                    'user': tmp['username'],
+                    'password': tmp['secret'],
+                  }
+                })
+
+                if uri in normed_proxy_auth:
+                    ## if one server is used for multiple protocols 
+                    ## we obviously need it only once
+                    continue
+
+                tmp.update({
+                  'type': 'generic_password',
+                  'state': 'present',
+                  'name': urlparse(uri).hostname,
+                })
+
+                normed_proxy_auth[uri] = tmp
+
+            my_subcfg['auth'] = normed_proxy_auth
+
+        return my_subcfg
 
 
 class ProxyConfigNormalizer(NormalizerBase):
@@ -74,31 +159,6 @@ class ProxyConfigNormalizer(NormalizerBase):
             return my_subcfg
 
         setdefault_none(my_subcfg, 'auto_detect', False)
-
-        return my_subcfg
-
-
-class ProxyAuthNormalizer(NormalizerBase):
-
-    def __init__(self, pluginref, *args, **kwargs):
-        super(ProxyAuthNormalizer, self).__init__(
-           pluginref, *args, **kwargs
-        )
-
-    @property
-    def config_path(self):
-        return ['auth']
-
-    def _handle_specifics_presub(self, cfg, my_subcfg, cfgpath_abs):
-        if not my_subcfg:
-            ## no authing set, dont do authing
-            return my_subcfg
-
-        my_subcfg.update({
-          'type': 'generic_password',
-          'state': 'present',
-          'name': urlparse(cfg['proxy']['config']['proxy']).hostname,
-        })
 
         return my_subcfg
 
