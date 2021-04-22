@@ -93,9 +93,6 @@
       loop_var: _choco_src_iter
 
 
-  - debug:
-      var: SMABOT_WIN_PROXY_SETTINGS
-
   - block:
 
       - name: set proxy server to  ==>>  {{ SMABOT_WIN_PROXY_SETTINGS.https.proxy }}
@@ -108,8 +105,12 @@
       - name: set proxy bypass list
         chocolatey.chocolatey.win_chocolatey_config:
           name: proxyBypassList
+
+          ## note: choco uses regex expressions for no-proxy, 
+          ##   convert win globby's to regex
           value: >-
-            {{ SMABOT_WIN_PROXY_SETTINGS.https.bypass_list | join(',') }}
+            {{ SMABOT_WIN_PROXY_SETTINGS.https.bypass_list | join(',') 
+             | replace('.', '\\.') | replace('*', '.*') }}
           state: present
         when: SMABOT_WIN_PROXY_SETTINGS.https.get('bypass_list', False)
 

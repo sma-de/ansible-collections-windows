@@ -66,9 +66,5 @@
           SMABOT_WIN_PROXY_SETTINGS: >-
             {{ smabot_win_inet_basics_args_normed.proxy.proxy_settings }}
 
-            
-      - debug:
-          var: SMABOT_WIN_PROXY_SETTINGS
-
     when: smabot_win_inet_basics_args_normed.get('proxy', {}).get('config', False)
 
