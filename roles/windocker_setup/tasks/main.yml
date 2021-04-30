@@ -1,0 +1,47 @@
+---
+
+## smabot_win_win_dockersetup_args:
+##   task_name: ## optional
+##   setup_args: ## mandatory
+##   ##become: ## optional, default no
+
+    ##
+    ## note: as this role actually has no real code (tasks) to run here, 
+    ##   we only just import its "namespace", in principle it would be 
+    ##   much better to use the meta dir for this, but as we learned 
+    ##   today, meta deps are not resolved / imported when this role 
+    ##   itself is "executed" by import/include_role statement / task, but 
+    ##   only when the high level playbook feature "roles:" is used, so 
+    ##   to make sure deps are always resolved we actually must import 
+    ##   them explicitly like this here
+    ##
+  - import_role:
+      name: smabot.windows.common_lib
+
+
+  - name: >-
+     {{ smabot_win_win_dockersetup_args.task_name 
+      | default('handle container/docker setup', True) }}
+
+    smabot.windows.windocker_setup: >-
+      {{ smabot_win_win_dockersetup_args.setup_args }}
+
+    ## ##
+    ## ## note: even if you use an admin account for your host connection, 
+    ## ##   you still need to use become here for cap installing, but not 
+    ## ##   for removing caps, I think the important difference here is 
+    ## ##   that for install external resources need to be queried while 
+    ## ##   for deinstallation only local resources are used
+    ## ##
+    ##become: "{{ win_capability_args.become | default('no', True) }}"
+    register: _tmp_setup_res
+
+
+  - import_role:
+      name: smabot.base.conditional_notify
+    vars:
+      conditional_notify_args:
+        taskname: check if reboot is needed
+        notify: "reboot os"
+        condition: "{{ _tmp_setup_res.reboot_needed }}"
+
