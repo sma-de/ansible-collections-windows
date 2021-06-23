@@ -62,6 +62,11 @@
              ## dont start other task instances while one is active
              multiple_instances: 2
 
+             ## if task could not be started at scheduled time 
+             ## because e.g. the server war rebootet, start it 
+             ## later as soon as it is possible
+             start_when_available: yes
+
              actions:
 
                - path: cmd.exe
@@ -75,7 +80,7 @@
                  ## note: date is meaningless here (indentently set 
                  ##   in the past), but we still need to specify 
                  ##   it so we can set a clock time to run this task
-                 start_boundary: '2000-10-09T00:02:00'
+                 start_boundary: '2000-10-09T02:02:02'
 
                  enabled: yes
 
