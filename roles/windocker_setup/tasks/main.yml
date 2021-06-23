@@ -3,6 +3,7 @@
 ## smabot_win_win_dockersetup_args:
 ##   task_name: ## optional
 ##   setup_args: ## mandatory
+##   cleanup_job: ## optional
 ##   ##become: ## optional, default no
 
     ##
@@ -33,8 +34,71 @@
     ## ##   that for install external resources need to be queried while 
     ## ##   for deinstallation only local resources are used
     ## ##
+    ## ## TODO: is this still true (??), why is this section outcommented??
+    ## ##
     ##become: "{{ win_capability_args.become | default('no', True) }}"
     register: _tmp_setup_res
+
+
+  - block:
+
+      - set_fact:
+          _tmp_modargs:
+             name: Cleanup Docker Storage
+
+             description: >-
+               Cleans the docker storage regularly by removing unused images
+               and container zombies.
+
+             ## show it in the task UI
+             hidden: no
+
+             ## allow starting it from the UI
+             allow_demand_start: yes
+
+             ## use latest version of task scheduler
+             compatibility: 2 
+
+             ## dont start other task instances while one is active
+             multiple_instances: 2
+
+             actions:
+
+               - path: cmd.exe
+                 arguments: /c docker system prune -af
+
+             triggers:
+
+               - type: weekly
+                 days_of_week: sun ## run sundays
+
+                 ## note: date is meaningless here (indentently set 
+                 ##   in the past), but we still need to specify 
+                 ##   it so we can set a clock time to run this task
+                 start_boundary: '2000-10-09T00:02:00'
+
+                 enabled: yes
+
+             username: SYSTEM
+
+             state: present
+             enabled: yes
+
+
+      - set_fact:
+          _tmp_modargs: >-
+             {{ _tmp_modargs | combine(
+                  smabot_win_win_dockersetup_args.cleanup_job, 
+                  recursive=True
+                )
+             }}
+        when: smabot_win_win_dockersetup_args.cleanup_job is mapping
+
+
+      - name: setup docker cleaning job
+        win_scheduled_task: "{{ _tmp_modargs }}"
+
+    when: smabot_win_win_dockersetup_args.get('cleanup_job', False)
 
 
   - import_role:
