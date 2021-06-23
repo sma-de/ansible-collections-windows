@@ -70,7 +70,7 @@
              triggers:
 
                - type: weekly
-                 days_of_week: sun ## run sundays
+                 days_of_week: sunday ## run sundays
 
                  ## note: date is meaningless here (indentently set 
                  ##   in the past), but we still need to specify 
