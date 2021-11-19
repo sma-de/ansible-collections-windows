@@ -71,9 +71,10 @@ class ServiceNormalizer(NormalizerBase):
 
 
     def _handle_specifics_presub(self, cfg, my_subcfg, cfgpath_abs):
-        setdefault_none(my_subcfg, 'user', 
-           self.pluginref.get_become_settings()['become_user']
-        )
+        ## update: default user should be kept unset and use upstream default
+        ##setdefault_none(my_subcfg, 'user',
+        ##   self.pluginref.get_become_settings()['become_user']
+        ##)
 
         custom_pvar = my_subcfg.get('custom_pathvar', None)
 
@@ -150,7 +151,10 @@ class ServiceConfigNormalizer(ServiceSubNormer):
 
     def _handle_specifics_presub(self, cfg, my_subcfg, cfgpath_abs):
         self._name_from_parent(cfg, my_subcfg, cfgpath_abs)
-        my_subcfg['username'] = self.get_parentcfg(cfg, cfgpath_abs)['user']
+        my_subcfg['username'] = self.get_parentcfg(
+           cfg, cfgpath_abs
+        ).get('user', None)
+
         return my_subcfg
 
 
