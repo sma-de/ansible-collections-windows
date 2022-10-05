@@ -168,7 +168,7 @@
     ##   obviously be better to get to the ground of this issue and
     ##   fix it properly (when possible):
     ##
-    ##     https://github.com/ansible-collections/azure/issues/715
+    ##     https://github.com/ansible/ansible/issues/14426
     ##
     register: _tmp_res_inifile
 
