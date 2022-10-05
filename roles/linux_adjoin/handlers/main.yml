@@ -1,0 +1,14 @@
+---
+
+  - name: restart sssd daemon
+    ansible.builtin.service:
+      name: sssd
+      state: restarted
+    listen: "restart sssd daemon"
+
+  - name: restart sshd daemon
+    ansible.builtin.service:
+      name: sshd
+      state: restarted
+    listen: "restart sshd daemon"
+

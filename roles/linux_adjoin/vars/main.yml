@@ -1,0 +1,33 @@
+---
+
+  smabot_adjoin_os_packages:
+  
+    ## used when no matching distro overwrite is found
+    default:
+      realmd:
+      sssd:
+      sssd-ad:
+      sssd-tools:
+      libnss-sss:
+      libpam-sss:
+      adcli:
+
+      ##
+      ## note: package kit can and will be used by realm client to
+      ##   automatically install missing packages, although we should
+      ##   already have installed all needed packages explicitly listed
+      ##   here at least for ubuntu realm will fail when packagekit
+      ##   itself is not installed
+      ##
+      packagekit:
+
+##    ## optionally overwrite package set for specific distros, name must be equal to ansible_distribution.lower()
+##    debian: # <-- this would completly replace default list
+##      foo:
+
+##    ubuntu+: # <-- suffixing a distro with "+" combines the additionally mentioned packages here with default list
+##      haha:
+##
+##    ubuntu-: # <-- suffixing a distro with "-" uses default list as base and then substracts mentioned packages there
+##      adcli:
+

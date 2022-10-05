@@ -1,0 +1,203 @@
+---
+
+##
+## smabot_windows_linux_adjoin_args:
+##
+##   domain: ## the domain to join, mandatory
+##
+##   ## when this is set ad groups and user are always
+##   ## fully qualified, meaning one must always attach
+##   ## @domain at the end for things to work out
+##   fqdn: # optional, boolean, defaults to true
+##
+##   join: ## params for realm join, mandatory
+##     config: 
+##       user: ## user with permission to join, mandatory
+##       password: ## user password, mandatory
+##       ou: ## ad organisational unit to use, optional
+##       state: ## present or absent, optional, defaults to present
+## 
+##   ## special user and group related settings
+##   users: # optional
+## 
+##     ## when this set a personal home directory will be automatically
+##     ## created the first time a new ad user logs into the machine
+##     auto_homedir: # boolean, optional, defaults to true
+## 
+##     ##auto_homedir: <--- use this pattern to disable home handling completly
+##     ##  disabled: true
+##
+##     # set this to allow ssh login per password
+##     pw_login_ssh: true # boolean, optional, defaults to "disabled", meaning that it does not change sshd config in any way
+##
+##     ##
+##     ## add users / ad groups here which should have sudo priviliges,
+##     ## note that this setting here supports only the very basic
+##     ## standard case of giving users full root access with or without
+##     ## sudo password, if you need more advanced stuff like e.g. access
+##     ## to only a specific subset of programs or similar better dont
+##     ## use this at all but manage sudoers in a custom role
+##     ##
+##     sudoers: # optional
+##       users:
+##         <username>:
+##       groups:
+##         <groupname>:
+##
+##            ##
+##            ## wether to set nopasswd in sudo file or not for this user/group
+##            ##
+##            ask_pw: # optional, boolean, defaults to true
+##
+##   ## configuration for sssd service
+##   sssd: # optional
+##     ##
+##     ## wether to set or unset pam_sss.so account line, it is
+##     ## recommended to leave this on default except when you run
+##     ## into problems on user login, disabling it might help to
+##     ## avoid following login errors:
+##     ##
+##     ## - "Authentication service cannot retrieve authentication info"
+##     ##
+##     pam_account: false # optional, defaults to "disabled", so keep system defaults intact (normally this should mean that pam_sss account line is active)
+##
+##     config: # optional
+##       path: # optional, path to config file, defaults to: '/etc/sssd/sssd.conf'
+##       base_template: # optional, when unset used realmd autoset variant as based (recommended)
+##
+##       ##
+##       ## extra options are directly added to sssd.conf key-value style
+##       ##
+##       extra_options:
+##         generic: # for generic sssd config section
+##
+##           ##
+##           ## note: on default nss and pam service are enabled in the realm config,
+##           ##   it is not that we dont want to use them but that on modern systems
+##           ##   this services are actually reachable by on demand systemd socket
+##           ##   activation and having them additionally directly loaded as modules
+##           ##   here leads to errors
+##           ##
+##           services:
+##              state: absent  <--- this is the default setting
+##
+##         domains: # domain specific section options
+##
+##           <domain-name>:
+##
+##             ## custom option, standard long submap form
+##             dyndns_update: # <-- key is used as key in config file
+##               value: true # <-- this is the config file value
+##
+##               ## when this is set all matching options are replaced or deleted, otherwise existing ones are not touched
+##               ##exclusive: # boolean, optional, defaults to true
+##
+##             ## note: shortform for longform above when no other
+##             ##   options must be set besides the value(s) itself
+##             dyndns_refresh_interval: 43200
+##
+
+
+  - smabot.windows.normalize_linux_adjoin_args:
+    register: _tmp_normres
+    no_log: true
+
+  - set_fact:
+      smabot_windows_linux_adjoin_args_normed: "{{ _tmp_normres.normalized }}"
+    no_log: true
+
+
+  # optional
+  - name: handle ntp sync
+    ansible.builtin.include_role:
+      name: smabot.base.ntp_chrony
+    vars:
+      smabot_base_ntp_chrony_args: >-
+        {{ smabot_windows_linux_adjoin_args_normed.ntp }}
+    when: smabot_windows_linux_adjoin_args_normed.ntp is truthy
+
+
+  - name: (de-) install necessary os packages
+    ansible.builtin.include_role:
+      name: smabot.base.os_packages
+    vars:
+      smabot_base_os_packages_args: >-
+        {{ smabot_windows_linux_adjoin_args_normed.os_packages._export }}
+
+
+    ##
+    ## note: as to my understanding we must pass the password on stdin
+    ##   (so per prompt) it is unfortunately possible that this call
+    ##   might hang, so use ansible async/poll system to assure a
+    ##   maximal timeout
+    ##
+    ## update: not totally sure yet if above is really true/necessary
+    ##
+  - name: (de-) join machine to active directory
+    smabot.windows.join_winad_realm: >-
+      {{ smabot_windows_linux_adjoin_args_normed.join.config }}
+    ##async: 60
+    ##poll: 5
+
+
+    # optional, on default uses the one auto created by realm command
+    # which is recommended for most cases
+  - name: use custom user base template as config basis
+    ansible.builtin.template:
+      src: "{{ smabot_windows_linux_adjoin_args_normed.sssd.config.base_template }}"
+      dest: "{{ smabot_windows_linux_adjoin_args_normed.sssd.config.path }}"
+    notify: "restart sssd daemon"
+    when: smabot_windows_linux_adjoin_args_normed.sssd.config.base_template
+
+
+    # optional
+  - name: adapt sssd configuration
+    community.general.ini_file: "{{ _iter_sssd_cfgopts }}"
+    notify: "restart sssd daemon"
+
+    loop: "{{ smabot_windows_linux_adjoin_args_normed.sssd.config.extra_options._export }}"
+    loop_control:
+      loop_var: _iter_sssd_cfgopts
+
+    register: _tmp_res_inifile
+
+    until: "{{ not _tmp_res_inifile.failed }}"
+    retries: 3
+    delay: 10
+
+
+  # optional
+  - name: assure sssd pam account is active (or not)
+    smabot.base.pamd_ext: >-
+      {{ smabot_windows_linux_adjoin_args_normed.sssd.pam_account.config }}
+    when: smabot_windows_linux_adjoin_args_normed.sssd.pam_account is truthy
+
+
+  # optional
+  - name: assure homedirs are created automatically on first login (or not)
+    smabot.base.pamd_ext: >-
+      {{ smabot_windows_linux_adjoin_args_normed.users.auto_homedir.config }}
+    when: smabot_windows_linux_adjoin_args_normed.users.auto_homedir is truthy
+
+
+  # optional
+  - name: make sure login per ssh with password is possible (or not)
+    ansible.builtin.lineinfile: >-
+      {{ smabot_windows_linux_adjoin_args_normed.users.pw_login_ssh.config }}
+    notify: "restart sshd daemon"
+    when: smabot_windows_linux_adjoin_args_normed.users.pw_login_ssh is truthy
+
+
+  # optional
+  - name: restrict ad login access to specific users/groups
+    ansible.builtin.include_tasks: restrict_login.yml 
+    when: smabot_windows_linux_adjoin_args_normed.users.restrict_login is truthy
+
+
+  # optional
+  - name: allow/deny sudo for ad user/group  ==>>  {{ _iter_sudoers.id }}
+    community.general.sudoers: "{{ _iter_sudoers.config }}"
+    loop: "{{ smabot_windows_linux_adjoin_args_normed.users.sudoers._identities }}"
+    loop_control:
+      loop_var: _iter_sudoers
+

@@ -1,0 +1,31 @@
+---
+
+  - set_fact:
+      _restrict_login_handled: false
+
+    # TODO: implement this
+    # note: in principle it is well documented and clear how to this but in practice it simply does not work in our case so it is hard to test
+  - ansible.builtin.fail:
+      msg: realm(d) based method of restricting user access not yet implemented
+    when: smabot_windows_linux_adjoin_args_normed.users.restrict_login.method == 'realmd'
+
+
+  - ansible.builtin.include_role:
+      name: smabot.base.login_restrict_pamacc
+    vars:
+      smabot_base_login_restrict_pamacc_args: >-
+        {{ smabot_windows_linux_adjoin_args_normed.users.restrict_login.restrictions }}
+    when: smabot_windows_linux_adjoin_args_normed.users.restrict_login.method == 'pam-access'
+
+  - set_fact:
+      _restrict_login_handled: true
+    when: smabot_windows_linux_adjoin_args_normed.users.restrict_login.method == 'pam-access'
+
+
+  - ansible.builtin.assert:
+      that:
+        - _restrict_login_handled
+      fail_msg: >-
+        Unsupported login restriction handling method
+        '{{ smabot_windows_linux_adjoin_args_normed.users.restrict_login.method }}'
+
