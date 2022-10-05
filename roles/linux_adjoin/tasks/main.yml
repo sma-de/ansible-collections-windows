@@ -159,6 +159,17 @@
     loop_control:
       loop_var: _iter_sssd_cfgopts
 
+    ##
+    ## note: for some reason running this fails with a strange error
+    ##   when first time applied to a machine, the error msg is very
+    ##   unspecific and seem to hint that it is actually nothing specific
+    ##   to this module but for us it strangely always fails here, so
+    ##   atm we guard against this by adding some retries but it would
+    ##   obviously be better to get to the ground of this issue and
+    ##   fix it properly (when possible):
+    ##
+    ##     https://github.com/ansible-collections/azure/issues/715
+    ##
     register: _tmp_res_inifile
 
     until: "{{ not _tmp_res_inifile.failed }}"
