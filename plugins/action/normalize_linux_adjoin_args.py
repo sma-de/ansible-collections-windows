@@ -573,8 +573,8 @@ class ActionModule(ConfigNormalizerBaseMerger):
     def __init__(self, *args, **kwargs):
         super(ActionModule, self).__init__(ConfigRootNormalizer(self), 
             *args,
-##            default_merge_vars=['smabot_win_inet_basics_args_defaults'], 
-##            extra_merge_vars_ans=['extra_smabot_win_inet_basics_args_config_maps'], 
+            default_merge_vars=['smabot_windows_linux_adjoin_args_defaults'],
+##            extra_merge_vars_ans=['extra_smabot_win_inet_basics_args_config_maps'],
             **kwargs
         )
 
