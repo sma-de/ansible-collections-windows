@@ -36,6 +36,7 @@ class ConfigRootNormalizer(NormalizerBase):
         subnorms = kwargs.setdefault('sub_normalizers', [])
         subnorms += [
           JoinConfigNormer(pluginref),
+          JoinRetryNormer(pluginref),
           SssdNormer(pluginref),
           UserNormer(pluginref),
           NtpNormer(pluginref),
@@ -381,6 +382,25 @@ class JoinConfigNormer(NormalizerBase):
         my_subcfg['domain'] = pcfg['domain']
         return my_subcfg
 
+
+class JoinRetryNormer(NormalizerBase):
+
+    def __init__(self, pluginref, *args, **kwargs):
+        self._add_defaultsetter(kwargs,
+           'num', DefaultSetterConstant(4)
+        )
+
+        self._add_defaultsetter(kwargs,
+           'delay', DefaultSetterConstant(30)  # unit is seconds
+        )
+
+        super(JoinRetryNormer, self).__init__(
+           pluginref, *args, **kwargs
+        )
+
+    @property
+    def config_path(self):
+        return ['join', 'retries']
 
 
 class SssdNormer(NormalizerBase):

@@ -136,6 +136,15 @@
   - name: (de-) join machine to active directory
     smabot.windows.join_winad_realm: >-
       {{ smabot_windows_linux_adjoin_args_normed.join.config }}
+
+    ##
+    ## note: depending on your network it is possible that this might
+    ##   fail sporadically, so we add some repetetion here to make it
+    ##   more robust
+    ##
+    retries: "{{ smabot_windows_linux_adjoin_args_normed.join.retries.num }}"
+    delay: "{{ smabot_windows_linux_adjoin_args_normed.join.retries.delay }}"
+
     ##async: 60
     ##poll: 5
 
