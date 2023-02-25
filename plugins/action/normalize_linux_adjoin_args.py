@@ -574,13 +574,16 @@ class ActionModule(ConfigNormalizerBaseMerger):
         super(ActionModule, self).__init__(ConfigRootNormalizer(self), 
             *args,
             default_merge_vars=['smabot_windows_linux_adjoin_args_defaults'],
-##            extra_merge_vars_ans=['extra_smabot_win_inet_basics_args_config_maps'],
+            extra_merge_vars_ans=['extra_smabot_windows_linux_adjoin_args_config_maps'],
             **kwargs
         )
 
         self._supports_check_mode = False
         self._supports_async = False
 
+    @property
+    def allow_empty(self):
+        return True
 
     @property
     def my_ansvar(self):
