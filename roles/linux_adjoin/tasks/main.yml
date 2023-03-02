@@ -142,6 +142,8 @@
     ##   fail sporadically, so we add some repetetion here to make it
     ##   more robust
     ##
+    register: _tmp_modres
+    until: _tmp_modres is not failed
     retries: "{{ smabot_windows_linux_adjoin_args_normed.join.retries.num }}"
     delay: "{{ smabot_windows_linux_adjoin_args_normed.join.retries.delay }}"
 
