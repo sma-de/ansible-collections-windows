@@ -39,6 +39,20 @@ options:
         Name of the domain which should be joined.
       type: str
       required: true
+    pc_name:
+      description: >-
+        How this machine should be known inside AD. Defaults to system
+        FQDN or to be totally precise, whatever 'hostname -f' returns.
+      type: str
+    pc_long_names_okay:
+      description: >-
+        Normally this module fails when the pc name to use for ad join
+        is longer than officially supported. As depending on your domain
+        setup it still might work out fine to use names officially too
+        long it is possible to request the module to go through with the
+        join by setting this option to true.
+      type: bool
+      default: False
     ou:
       description: >-
         LDAP / AD organisational unit attribute.
@@ -121,6 +135,19 @@ ansible_facts:
 
 from ansible.module_utils.basic import AnsibleModule
 
+
+##
+## incredible enough even in 2022 the maximally safely supported
+## length of a pcname in windows AD is this rather short value,
+## longer names dont error out but seem to be silently truncated
+## to max length, which might result in different machines
+## overwriting its access to ad each other when they have too long
+## names which only start to differ after the 15th character, see also:
+##
+##   https://community.spiceworks.com/topic/2035620-can-we-use-hostnames-longer-than-15-characters
+##   https://learn.microsoft.com/en-US/troubleshoot/windows-server/identity/naming-conventions-for-computer-domain-site-ou
+##
+PCNAME_MAX_SAFE_LEN = 15
 
 
 class RealmJoiner(AnsibleModule):
@@ -253,6 +280,53 @@ class RealmJoiner(AnsibleModule):
             ##kwargs['prompt_regex'] = r'(?i)password\s+.*{}\s*:'.format(user)
 
         if command == 'join':
+            hname = self.params['pc_name']
+
+            if not hname:
+                ## note: this emulates what upstream command does
+                ##   on default when no name is specified
+                rc, hname, stderr = self.run_command(
+                   ['hostname', '-f'], check_rc=True
+                )
+
+                hname = hname.strip()
+
+            if len(hname) > PCNAME_MAX_SAFE_LEN:
+                msg = "Given pc name '{}' is longer than supported"\
+                      " by windows ad ({} > {})".format(hname,
+                         len(hname), PCNAME_MAX_SAFE_LEN
+                      )
+
+                if not self.params['pc_long_names_okay']:
+                    self.fail_json(
+                       "{}. Either shorten the hostname of the machine"\
+                       " to at least {} characters or give an explicit"\
+                       " alias ad name as module parameter 'pc_name'."\
+                       " Alternatively it is also possible to ignore this"\
+                       " error by setting module parameter"\
+                       " 'pc_long_names_okay' to true which depending on"\
+                       " your setup and which machines you have in your"\
+                       " AD might still work for you, but it can also"\
+                       " result in some machines loosing AD access because"\
+                       " they \"are overwritten\" by another similarly"\
+                       " named ones.".format(msg, PCNAME_MAX_SAFE_LEN),
+                       **result
+                    )
+
+                ## downgrade error to warning
+                self.warn(
+                   "{}. It is recommended to either shorten the hostname"\
+                   " of the machine to at least {} characters or give an"\
+                   " explicit alias AD name as module parameter 'pc_name'"\
+                   " as otherwise different machines might \"overwrite\""\
+                   " there access to AD when there long names only differ"\
+                   " after the maximal officially supported length.".format(
+                      msg, PCNAME_MAX_SAFE_LEN
+                   )
+                )
+
+            args += ['--computer-name', hname]
+
             # handle join specific args
             ou = self.params['ou']
 
@@ -279,8 +353,10 @@ class RealmJoiner(AnsibleModule):
 
         if rc != 0:
             self.fail_json(
-               "Trying to {} given AD domain"\
-               " failed with rc '{}': {}".format(command, rc, stderr),
+               "Trying to {} given AD domain failed with rc"\
+               " '{}':\n  cmd run: {}\n  error: {}".format(
+                  command, rc, ' '.join(args), stderr
+               ),
                **result
             )
 
@@ -361,6 +437,13 @@ def run_module():
       domain=dict(
         type='str',
         required=True,
+      ),
+      pc_name=dict(
+        type='str',
+      ),
+      pc_long_names_okay=dict(
+        type='bool',
+        default=False,
       ),
       ou=dict(
         type='str',
