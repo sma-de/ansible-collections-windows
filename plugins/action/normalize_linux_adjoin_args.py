@@ -37,6 +37,7 @@ class ConfigRootNormalizer(NormalizerBase):
         subnorms += [
           JoinConfigNormer(pluginref),
           JoinRetryNormer(pluginref),
+          JoinCheckAndRepairNormer(pluginref),
           SssdNormer(pluginref),
           UserNormer(pluginref),
           NtpNormer(pluginref),
@@ -401,6 +402,22 @@ class JoinRetryNormer(NormalizerBase):
     @property
     def config_path(self):
         return ['join', 'retries']
+
+
+class JoinCheckAndRepairNormer(NormalizerBase):
+
+##    def __init__(self, pluginref, *args, **kwargs):
+##        super(JoinCheckAndRepairNormer, self).__init__(
+##           pluginref, *args, **kwargs
+##        )
+
+    @property
+    def config_path(self):
+        return ['join', 'check_and_repair']
+
+    def _handle_specifics_presub(self, cfg, my_subcfg, cfgpath_abs):
+        setdefault_none(my_subcfg, 'enabled', bool(my_subcfg))
+        return my_subcfg
 
 
 class SssdNormer(NormalizerBase):

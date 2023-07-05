@@ -1,0 +1,71 @@
+---
+
+## note: using builtin getent module here is problematic because when forcing it to no fail we have no clean way to find out if it worked or not because it doesn't return a rc
+##  - name: try querying AD test group  ==>>  "{{ smabot_windows_linux_adjoin_args_normed.join.check_and_repair.test_group }}"
+##    ansible.builtin.getent:
+##      database: group
+##      key: "{{ smabot_windows_linux_adjoin_args_normed.join.check_and_repair.test_group }}"
+##    register: _tmp_res_testquery
+##    failed_when: false
+
+  - name: try querying AD test group  ==>>  "{{ smabot_windows_linux_adjoin_args_normed.join.check_and_repair.test_group }}"
+    ansible.builtin.command:
+      argv:
+        - getent
+        - group
+        - "{{ smabot_windows_linux_adjoin_args_normed.join.check_and_repair.test_group }}"
+    register: _tmp_res_testquery
+    changed_when: false
+    failed_when: false
+
+
+  - block:
+
+      - ansible.builtin.debug:
+          msg: >-
+            AD test query failed, auto-repair connection by disconnecting than reconnecting to AD
+
+
+        ## force a disconnect from AD
+      - set_fact:
+          _tmp_smabot_windows_linux_adjoin_join_cfg: >-
+             {{ smabot_windows_linux_adjoin_args_normed.join.config | combine({'state': 'absent'}) }}
+        no_log: true
+
+      - include_tasks: handle_join.yml
+
+        ## ... now reconnect
+      - set_fact:
+          _tmp_smabot_windows_linux_adjoin_join_cfg: >-
+             {{ smabot_windows_linux_adjoin_args_normed.join.config }}
+        no_log: true
+
+      - include_tasks: handle_join.yml
+
+
+      ##- name: repeat AD group test querying
+      ##  ansible.builtin.getent:
+      ##    database: group
+      ##    key: "{{ smabot_windows_linux_adjoin_args_normed.join.check_and_repair.test_group }}"
+      ##  register: _tmp_res_testquery
+      ##  failed_when: false
+
+      - name: repeat AD group test querying
+        ansible.builtin.command:
+          argv:
+            - getent
+            - group
+            - "{{ smabot_windows_linux_adjoin_args_normed.join.check_and_repair.test_group }}"
+        register: _tmp_res_testquery_again
+        changed_when: false
+        failed_when: false
+
+      - name: assure AD connection is fixed now
+        ansible.builtin.assert:
+          that:
+            - _tmp_res_testquery_again.rc == 0
+          fail_msg: >-
+            AD connection still not working post auto-repair, this is bad.
+
+    when: _tmp_res_testquery.rc != 0
+

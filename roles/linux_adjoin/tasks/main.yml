@@ -125,30 +125,12 @@
         {{ smabot_windows_linux_adjoin_args_normed.os_packages._export }}
 
 
-    ##
-    ## note: as to my understanding we must pass the password on stdin
-    ##   (so per prompt) it is unfortunately possible that this call
-    ##   might hang, so use ansible async/poll system to assure a
-    ##   maximal timeout
-    ##
-    ## update: not totally sure yet if above is really true/necessary
-    ##
-  - name: (de-) join machine to active directory
-    smabot.windows.join_winad_realm: >-
-      {{ smabot_windows_linux_adjoin_args_normed.join.config }}
+  - set_fact:
+      _tmp_smabot_windows_linux_adjoin_join_cfg: >-
+         {{ smabot_windows_linux_adjoin_args_normed.join.config }}
+    no_log: true
 
-    ##
-    ## note: depending on your network it is possible that this might
-    ##   fail sporadically, so we add some repetetion here to make it
-    ##   more robust
-    ##
-    register: _tmp_modres
-    until: _tmp_modres is not failed
-    retries: "{{ smabot_windows_linux_adjoin_args_normed.join.retries.num }}"
-    delay: "{{ smabot_windows_linux_adjoin_args_normed.join.retries.delay }}"
-
-    ##async: 60
-    ##poll: 5
+  - include_tasks: handle_join.yml
 
 
     # optional, on default uses the one auto created by realm command
@@ -205,4 +187,11 @@
     loop: "{{ smabot_windows_linux_adjoin_args_normed.users.sudoers._identities }}"
     loop_control:
       loop_var: _iter_sudoers
+
+
+  # optional: check and auto repair ad connection
+  - include_tasks: check_and_repair.yml
+    when: >-
+      smabot_windows_linux_adjoin_args_normed.join.check_and_repair.enabled
+      and _tmp_res_adjoin is not changed
 
